@@ -1,0 +1,3206 @@
+{
+  "users": [
+    {
+      "id": "USR-PAT-01",
+      "username": "patient",
+      "passwordHash": "demo123",
+      "role": "PATIENT",
+      "name": "Smt. Radha Sharma",
+      "email": "radha.sharma@example.com",
+      "phone": "+91 98765 43210",
+      "createdAt": "2026-08-20T08:30:00Z"
+    },
+    {
+      "id": "USR-DOC-01",
+      "username": "doctor",
+      "passwordHash": "doctor123",
+      "role": "DOCTOR",
+      "name": "Prof. (Dr.) Ananya Sharma",
+      "email": "dr.ananya@aiia.gov.in",
+      "phone": "+91 98111 22334",
+      "avatarUrl": "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80",
+      "createdAt": "2026-01-10T09:00:00Z"
+    },
+    {
+      "id": "USR-DOC-02",
+      "username": "dr_vikram",
+      "passwordHash": "doctor123",
+      "role": "DOCTOR",
+      "name": "Dr. Vikramaditya Sen",
+      "email": "dr.sen@aiia.gov.in",
+      "phone": "+91 98222 33445",
+      "avatarUrl": "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=300&q=80",
+      "createdAt": "2026-01-15T09:00:00Z"
+    },
+    {
+      "id": "USR-TRIAGE-01",
+      "username": "triage",
+      "passwordHash": "triage123",
+      "role": "TRIAGE",
+      "name": "Sister Suniti Rao (Triage Nurse)",
+      "email": "triage.station1@aiia.gov.in",
+      "phone": "+91 98333 44556",
+      "createdAt": "2026-02-01T08:00:00Z"
+    },
+    {
+      "id": "USR-ADMIN-01",
+      "username": "admin",
+      "passwordHash": "admin123",
+      "role": "ADMIN",
+      "name": "Dr. Harish Chandra (MS / Admin)",
+      "email": "admin.ms@aiia.gov.in",
+      "phone": "+91 98444 55667",
+      "createdAt": "2026-01-01T08:00:00Z"
+    },
+    {
+      "id": "USR-SYSADMIN-01",
+      "username": "sysadmin",
+      "passwordHash": "sysadmin123",
+      "role": "SYSTEM_ADMIN",
+      "name": "DevOps / Integration Lead",
+      "email": "tech.lead@aiia.gov.in",
+      "phone": "+91 98555 66778",
+      "createdAt": "2026-01-01T08:00:00Z"
+    }
+  ],
+  "patients": [
+    {
+      "id": "PAT-HERO-01",
+      "mkPatientId": "MK-PAT-2026-000124",
+      "abhaNumber": "91-4829-1029-4821",
+      "abhaAddress": "radha.sharma@abdm",
+      "name": "Smt. Radha Sharma",
+      "age": 58,
+      "dob": "1968-04-14",
+      "gender": "FEMALE",
+      "phone": "+91 98765 43210",
+      "address": "H.No. 42, Sector 15, Vasundhara, Ghaziabad, UP",
+      "emergencyContact": {
+        "name": "Manoj Sharma (Son)",
+        "relationship": "Son",
+        "phone": "+91 98765 11223"
+      },
+      "language": "hi",
+      "accessibilityNeeds": [
+        "AUDIO_GUIDANCE",
+        "LARGE_TOUCH_TARGETS"
+      ],
+      "isDemo": true,
+      "registeredAt": "2026-08-20T08:30:00Z"
+    },
+    {
+      "id": "PAT-EMERG-02",
+      "mkPatientId": "MK-PAT-2026-000125",
+      "abhaNumber": "91-5912-3841-9920",
+      "abhaAddress": "rajesh.patel@abdm",
+      "name": "Shri Rajesh Patel",
+      "age": 62,
+      "dob": "1964-11-03",
+      "gender": "MALE",
+      "phone": "+91 97111 88990",
+      "address": "Flat 302, Green Avenue, Noida Sector 62, UP",
+      "emergencyContact": {
+        "name": "Kavita Patel (Wife)",
+        "relationship": "Spouse",
+        "phone": "+91 97111 44556"
+      },
+      "language": "en",
+      "accessibilityNeeds": [
+        "URGENT_TRIAGE"
+      ],
+      "isDemo": true,
+      "registeredAt": "2026-08-28T07:15:00Z"
+    },
+    {
+      "id": "PAT-DOCS-03",
+      "mkPatientId": "MK-PAT-2026-000126",
+      "abhaNumber": "91-7721-4412-8833",
+      "abhaAddress": "sunita.verma@abdm",
+      "name": "Smt. Sunita Verma",
+      "age": 52,
+      "dob": "1974-06-21",
+      "gender": "FEMALE",
+      "phone": "+91 98222 11447",
+      "address": "B-14, Mayur Vihar Phase 1, New Delhi",
+      "emergencyContact": {
+        "name": "Alok Verma (Husband)",
+        "relationship": "Spouse",
+        "phone": "+91 98222 99881"
+      },
+      "language": "en",
+      "accessibilityNeeds": [],
+      "isDemo": true,
+      "registeredAt": "2026-08-25T10:00:00Z"
+    },
+    {
+      "id": "PAT-TOUCH-04",
+      "mkPatientId": "MK-PAT-2026-000127",
+      "abhaNumber": "91-3321-9901-5544",
+      "abhaAddress": "ramu.lal@abdm",
+      "name": "Shri Ramu Lal",
+      "age": 67,
+      "dob": "1959-02-18",
+      "gender": "MALE",
+      "phone": "+91 96555 12345",
+      "address": "Village Chhajarsi, District Gautam Buddha Nagar, UP",
+      "emergencyContact": {
+        "name": "Dinesh Lal (Son)",
+        "relationship": "Son",
+        "phone": "+91 96555 67890"
+      },
+      "language": "hi",
+      "accessibilityNeeds": [
+        "VOICE_ONLY",
+        "HIGH_CONTRAST",
+        "AUDIO_ASSIST"
+      ],
+      "isDemo": true,
+      "registeredAt": "2026-08-27T09:40:00Z"
+    },
+    {
+      "id": "PAT-PED-05",
+      "mkPatientId": "MK-PAT-2026-000128",
+      "abhaNumber": "91-1122-3344-5566",
+      "abhaAddress": "aarav.mehta@abdm",
+      "name": "Master Aarav Mehta",
+      "age": 7,
+      "dob": "2019-09-12",
+      "gender": "MALE",
+      "phone": "+91 99100 22334",
+      "address": "C-48, Indirapuram, Ghaziabad, UP",
+      "emergencyContact": {
+        "name": "Pooja Mehta (Mother)",
+        "relationship": "Parent",
+        "phone": "+91 99100 22334"
+      },
+      "language": "hi",
+      "accessibilityNeeds": [],
+      "isDemo": true,
+      "registeredAt": "2026-08-26T11:20:00Z"
+    }
+  ],
+  "consents": [
+    {
+      "id": "CNS-6KI9HWX",
+      "version": "v2.4-DPDP-2026",
+      "status": "ACTIVE",
+      "grantedAt": "2026-08-29T16:27:55.815Z",
+      "ipAddress": "::1",
+      "signatureType": "ELECTRONIC_DEMO",
+      "patientId": "PAT-HERO-01",
+      "purposes": {
+        "personalInfo": true,
+        "clinicalHistory": true,
+        "voiceRecording": true,
+        "ocrDocuments": true,
+        "aiSummary": true,
+        "abdmDataExchange": true
+      }
+    }
+  ],
+  "hospitals": [
+    {
+      "id": "HOSP-01",
+      "name": "All India Institute of Ayurveda (AIIA) — Demo",
+      "code": "AIIA-ND-01",
+      "type": "AYUSH_CENTRAL",
+      "address": "Gautampuri, Sarita Vihar, Mathura Road, New Delhi, Delhi 110076",
+      "phone": "011-26950401",
+      "activeOpdCount": 14,
+      "currentQueueLength": 28
+    },
+    {
+      "id": "HOSP-02",
+      "name": "National Institute of Ayurveda (NIA) — Demo",
+      "code": "NIA-JP-02",
+      "type": "AYUSH_CENTRAL",
+      "address": "Jorawar Singh Gate, Amer Road, Jaipur, Rajasthan 302002",
+      "phone": "0141-2635816",
+      "activeOpdCount": 9,
+      "currentQueueLength": 16
+    },
+    {
+      "id": "HOSP-03",
+      "name": "Government Integrated AYUSH District Hospital — Demo",
+      "code": "GAYUSH-VAR-03",
+      "type": "DISTRICT_INTEGRATED",
+      "address": "Pandeypur, Varanasi, Uttar Pradesh 221002",
+      "phone": "0542-2501234",
+      "activeOpdCount": 6,
+      "currentQueueLength": 12
+    }
+  ],
+  "departments": [
+    {
+      "id": "DEP-01",
+      "hospitalId": "HOSP-01",
+      "name": "Kayachikitsa (General Ayurvedic Medicine)",
+      "code": "KAYA",
+      "isAyush": true,
+      "ayushBranch": "KAYACHIKITSA",
+      "description": "Internal medicine dealing with metabolic, rheumatological, digestive, and lifestyle disorders.",
+      "iconName": "Activity"
+    },
+    {
+      "id": "DEP-02",
+      "hospitalId": "HOSP-01",
+      "name": "Panchakarma (Biocleansing & Detox)",
+      "code": "PANCHA",
+      "isAyush": true,
+      "ayushBranch": "PANCHAKARMA",
+      "description": "Specialized 5-fold detoxification, Vamana, Virechana, Basti, Nasya, and Raktamokshana.",
+      "iconName": "Sparkles"
+    },
+    {
+      "id": "DEP-03",
+      "hospitalId": "HOSP-01",
+      "name": "Shalya Tantra (Ayurvedic Surgery & Ksharasutra)",
+      "code": "SHALYA",
+      "isAyush": true,
+      "ayushBranch": "SHALYA",
+      "description": "Surgical management, ano-rectal clinic, wound healing (Vrana), and Ksharasutra therapy.",
+      "iconName": "Scissors"
+    },
+    {
+      "id": "DEP-04",
+      "hospitalId": "HOSP-01",
+      "name": "Shalakya Tantra (ENT & Ophthalmology)",
+      "code": "SHALAKYA",
+      "isAyush": true,
+      "ayushBranch": "SHALAKYA",
+      "description": "Diseases of eye (Netra), ear-nose-throat, and oral cavity.",
+      "iconName": "Eye"
+    },
+    {
+      "id": "DEP-05",
+      "hospitalId": "HOSP-01",
+      "name": "Striroga & Prasuti Tantra (Gynaecology & Obstetrics)",
+      "code": "STRIROGA",
+      "isAyush": true,
+      "ayushBranch": "STRIROGA",
+      "description": "Maternal health, garbha sanskara, PCOS, and gynaecological disorders.",
+      "iconName": "HeartHandshake"
+    },
+    {
+      "id": "DEP-06",
+      "hospitalId": "HOSP-01",
+      "name": "Kaumarbhritya (Ayurvedic Paediatrics)",
+      "code": "KAUMAR",
+      "isAyush": true,
+      "ayushBranch": "KAUMARBHRITYA",
+      "description": "Child healthcare, growth assessment, Swarnaprashana, and immunity enhancement.",
+      "iconName": "Smile"
+    },
+    {
+      "id": "DEP-07",
+      "hospitalId": "HOSP-01",
+      "name": "Swasthavritta & Yoga (Preventive Medicine)",
+      "code": "SWASTHA",
+      "isAyush": true,
+      "ayushBranch": "SWASTHAVRITTA",
+      "description": "Dinacharya, Ritucharya, therapeutic yoga, and public health counseling.",
+      "iconName": "Sun"
+    },
+    {
+      "id": "DEP-08",
+      "hospitalId": "HOSP-01",
+      "name": "General Medicine & Modern OPD",
+      "code": "GENMED",
+      "isAyush": false,
+      "description": "Integrated allopathic evaluation, emergency triage, and modern diagnostic coordination.",
+      "iconName": "Stethoscope"
+    }
+  ],
+  "practitioners": [
+    {
+      "id": "PRAC-01",
+      "userId": "USR-DOC-01",
+      "hospitalId": "HOSP-01",
+      "departmentId": "DEP-01",
+      "name": "Prof. (Dr.) Ananya Sharma",
+      "title": "Vaidya / Senior Consultant",
+      "specialty": "Kayachikitsa & Rheumatology (Sandhivata)",
+      "qualifications": "BAMS (Gold Medalist), MD (AIIA), PhD",
+      "roomNumber": "OPD Room 104 (Ground Floor)",
+      "experienceYears": 18,
+      "opdTiming": "09:00 AM - 01:30 PM",
+      "isAvailable": true,
+      "avgConsultationMins": 12,
+      "activeQueueCount": 4
+    },
+    {
+      "id": "PRAC-02",
+      "userId": "USR-DOC-01",
+      "hospitalId": "HOSP-01",
+      "departmentId": "DEP-02",
+      "name": "Vaidya Raghavendra Joshi",
+      "title": "Associate Professor",
+      "specialty": "Panchakarma & Neurological Rehabilitation",
+      "qualifications": "BAMS, MD (Panchakarma, NIA Jaipur)",
+      "roomNumber": "OPD Room 108 (Ground Floor)",
+      "experienceYears": 14,
+      "opdTiming": "09:30 AM - 02:00 PM",
+      "isAvailable": true,
+      "avgConsultationMins": 15,
+      "activeQueueCount": 3
+    },
+    {
+      "id": "PRAC-03",
+      "userId": "USR-DOC-02",
+      "hospitalId": "HOSP-01",
+      "departmentId": "DEP-08",
+      "name": "Dr. Vikramaditya Sen",
+      "title": "Chief Medical Officer",
+      "specialty": "Internal Medicine & Critical Care Triage",
+      "qualifications": "MBBS, MD (General Medicine, AIIMS New Delhi)",
+      "roomNumber": "OPD Room 201 (First Floor)",
+      "experienceYears": 16,
+      "opdTiming": "08:30 AM - 02:00 PM",
+      "isAvailable": true,
+      "avgConsultationMins": 10,
+      "activeQueueCount": 6
+    },
+    {
+      "id": "PRAC-04",
+      "userId": "USR-DOC-01",
+      "hospitalId": "HOSP-01",
+      "departmentId": "DEP-03",
+      "name": "Dr. Meenakshi Sundaram",
+      "title": "Senior Surgeon (Ayush)",
+      "specialty": "Shalya Tantra & Ksharasutra",
+      "qualifications": "BAMS, MS (Ayurvedic Surgery, IPGTRA Jamnagar)",
+      "roomNumber": "OPD Room 112 (Ground Floor)",
+      "experienceYears": 12,
+      "opdTiming": "10:00 AM - 02:30 PM",
+      "isAvailable": true,
+      "avgConsultationMins": 14,
+      "activeQueueCount": 2
+    },
+    {
+      "id": "PRAC-05",
+      "userId": "USR-DOC-01",
+      "hospitalId": "HOSP-01",
+      "departmentId": "DEP-05",
+      "name": "Dr. Priya Nambiar",
+      "title": "Assistant Professor",
+      "specialty": "Striroga, Prasuti & Infertility",
+      "qualifications": "BAMS, MD (Prasuti Tantra, Kerala Ayurveda)",
+      "roomNumber": "OPD Room 106 (Ground Floor)",
+      "experienceYears": 10,
+      "opdTiming": "09:00 AM - 01:00 PM",
+      "isAvailable": true,
+      "avgConsultationMins": 12,
+      "activeQueueCount": 3
+    }
+  ],
+  "appointments": [
+    {
+      "id": "APT-001",
+      "appointmentNumber": "APT-2026-0828-027",
+      "patientId": "PAT-HERO-01",
+      "practitionerId": "PRAC-01",
+      "departmentId": "DEP-01",
+      "hospitalId": "HOSP-01",
+      "slotDate": "2026-08-28",
+      "slotTime": "09:15 AM",
+      "status": "CHECKED_IN",
+      "bookedAt": "2026-08-28T08:08:00Z"
+    },
+    {
+      "id": "APT-002",
+      "appointmentNumber": "APT-2026-0828-028",
+      "patientId": "PAT-EMERG-02",
+      "practitionerId": "PRAC-03",
+      "departmentId": "DEP-08",
+      "hospitalId": "HOSP-01",
+      "slotDate": "2026-08-28",
+      "slotTime": "09:30 AM",
+      "status": "TRIAGED",
+      "bookedAt": "2026-08-28T08:15:00Z"
+    },
+    {
+      "id": "APT-003",
+      "appointmentNumber": "APT-2026-0828-029",
+      "patientId": "PAT-DOCS-03",
+      "practitionerId": "PRAC-01",
+      "departmentId": "DEP-01",
+      "hospitalId": "HOSP-01",
+      "slotDate": "2026-08-28",
+      "slotTime": "09:45 AM",
+      "status": "BOOKED",
+      "bookedAt": "2026-08-28T08:20:00Z"
+    },
+    {
+      "id": "APT-H7WNV20",
+      "appointmentNumber": "APT-2026-0828-030",
+      "bookedAt": "2026-08-29T16:11:05.578Z",
+      "status": "BOOKED",
+      "patientId": "PAT-HERO-01",
+      "practitionerId": "PRAC-01",
+      "departmentId": "DEP-01",
+      "hospitalId": "HOSP-01",
+      "slotDate": "2026-08-28",
+      "slotTime": "09:30 AM"
+    },
+    {
+      "id": "APT-6OZY65C",
+      "appointmentNumber": "APT-2026-0828-031",
+      "bookedAt": "2026-08-29T16:28:16.122Z",
+      "status": "BOOKED",
+      "patientId": "PAT-HERO-01",
+      "practitionerId": "PRAC-01",
+      "departmentId": "DEP-01",
+      "hospitalId": "HOSP-01",
+      "slotDate": "2026-08-28",
+      "slotTime": "09:15 AM"
+    }
+  ],
+  "queueTokens": [
+    {
+      "id": "TOK-025",
+      "tokenNumber": "A-025",
+      "appointmentId": "APT-000",
+      "patientId": "PAT-DOCS-03",
+      "practitionerId": "PRAC-01",
+      "status": "COMPLETED",
+      "priority": "NORMAL",
+      "estimatedWaitMins": 0,
+      "checkInTime": "2026-08-28T08:30:00Z",
+      "calledTime": "2026-08-28T08:50:00Z",
+      "completedTime": "2026-08-29T16:14:17.023Z"
+    },
+    {
+      "id": "TOK-026",
+      "tokenNumber": "A-026",
+      "appointmentId": "APT-000B",
+      "patientId": "PAT-TOUCH-04",
+      "practitionerId": "PRAC-01",
+      "status": "COMPLETED",
+      "priority": "NORMAL",
+      "estimatedWaitMins": 0,
+      "checkInTime": "2026-08-28T08:35:00Z",
+      "calledTime": "2026-08-29T16:14:17.023Z",
+      "completedTime": "2026-08-29T16:14:19.095Z"
+    },
+    {
+      "id": "TOK-027",
+      "tokenNumber": "A-027",
+      "appointmentId": "APT-001",
+      "patientId": "PAT-HERO-01",
+      "practitionerId": "PRAC-01",
+      "status": "COMPLETED",
+      "priority": "NORMAL",
+      "estimatedWaitMins": 0,
+      "checkInTime": "2026-08-28T08:45:00Z",
+      "calledTime": "2026-08-29T16:14:19.095Z",
+      "completedTime": "2026-08-29T16:14:21.719Z"
+    },
+    {
+      "id": "TOK-028",
+      "tokenNumber": "EMERG-001",
+      "appointmentId": "APT-002",
+      "patientId": "PAT-EMERG-02",
+      "practitionerId": "PRAC-03",
+      "status": "TRIAGE_URGENT",
+      "priority": "EMERGENCY",
+      "estimatedWaitMins": 1,
+      "checkInTime": "2026-08-28T08:48:00Z"
+    },
+    {
+      "id": "TOK-HED7PTE",
+      "tokenNumber": "A-025",
+      "appointmentId": "APT-H7WNV20",
+      "patientId": "PAT-HERO-01",
+      "practitionerId": "PRAC-01",
+      "status": "COMPLETED",
+      "priority": "NORMAL",
+      "estimatedWaitMins": 0,
+      "checkInTime": "2026-08-29T16:11:05.578Z",
+      "calledTime": "2026-08-29T16:14:21.719Z",
+      "completedTime": "2026-08-29T16:15:03.628Z"
+    },
+    {
+      "id": "TOK-TKHWWUH",
+      "tokenNumber": "A-026",
+      "appointmentId": "APT-6OZY65C",
+      "patientId": "PAT-HERO-01",
+      "practitionerId": "PRAC-01",
+      "status": "WAITING",
+      "priority": "NORMAL",
+      "estimatedWaitMins": 12,
+      "checkInTime": "2026-08-29T16:28:16.122Z"
+    }
+  ],
+  "clinicalSessions": [
+    {
+      "id": "SES-HERO-01",
+      "patientId": "PAT-HERO-01",
+      "appointmentId": "APT-001",
+      "departmentId": "DEP-01",
+      "isAyush": true,
+      "status": "COMPLETED",
+      "chiefComplaint": "Bilateral knee joint pain, morning stiffness for 6 months, and mild post-meal bloating.",
+      "startedAt": "2026-08-28T08:10:00Z",
+      "completedAt": "2026-08-28T08:25:00Z",
+      "redFlagTriggered": false
+    }
+  ],
+  "clinicalAnswers": [
+    {
+      "id": "ANS-001",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_CC_01",
+      "questionText": "Tell me what brings you to the hospital today. / आज आप किस तकलीफ के लिए आए हैं?",
+      "answerText": "Mujhe dono ghutno me pichhle 6 mahine se dard aur subah jakdan rehti hai. Sath hi khana khane ke baad pet me bhari-pan aur gas banti hai.",
+      "inputMode": "VOICE",
+      "voiceTranscript": "मुझे दोनों घुटनों में पिछले 6 महीने से दर्द और सुबह जकड़न रहती है। साथ ही खाना खाने के बाद पेट में भारीपन और गैस बनती है।",
+      "confidence": 0.96,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_VOICE",
+      "timestamp": "2026-08-28T08:11:30Z"
+    },
+    {
+      "id": "ANS-002",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_PAIN_SEV",
+      "questionText": "How severe is the joint pain on a daily basis?",
+      "answerText": "Moderate to Severe (Score: 6/10), worsens while climbing stairs and during cold weather.",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-28T08:12:45Z"
+    },
+    {
+      "id": "ANS-003",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_MORNING_STIFF",
+      "questionText": "Do you experience morning stiffness, and for how long?",
+      "answerText": "Yes, about 30 to 45 minutes every morning (Sandhi Stambha).",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-28T08:13:30Z"
+    },
+    {
+      "id": "ANS-004",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_DIGESTION_AGNI",
+      "questionText": "How is your appetite and bowel habit? (Agni & Koshtha assessment)",
+      "answerText": "Appetite is irregular (Vishamagni). Irregular bowel movements, prone to constipation and dry stools.",
+      "inputMode": "MIXED",
+      "voiceTranscript": "भूख कभी लगती है कभी नहीं लगती। पेट साफ ठीक से नहीं होता, कब्ज रहता है।",
+      "confidence": 0.94,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_VOICE",
+      "timestamp": "2026-08-28T08:15:10Z"
+    },
+    {
+      "id": "ANS-005",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_MED_HISTORY",
+      "questionText": "Are you currently taking any regular medications?",
+      "answerText": "Tab Amlodipine 5mg once daily for Hypertension. Occasionally Tab Paracetamol 650mg for knee pain relief.",
+      "inputMode": "VOICE",
+      "voiceTranscript": "बीपी की गोली खाती हूँ एमलोडिपिन 5 मिलीग्राम रोज। घुटने के दर्द के लिए कभी-कभी पैरासिटामोल ले लेती हूँ।",
+      "confidence": 0.95,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_VOICE",
+      "timestamp": "2026-08-28T08:16:50Z"
+    },
+    {
+      "id": "ANS-B8DR0WK",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_KNEE_LOC",
+      "questionText": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?",
+      "answerText": "दोनों घुटने",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:08.402Z"
+    },
+    {
+      "id": "ANS-86H9N5M",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_KNEE_LOC",
+      "questionText": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?",
+      "answerText": "दोनों घुटने",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:08.490Z"
+    },
+    {
+      "id": "ANS-QHQKGOP",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_PAIN_SEVERITY",
+      "questionText": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?",
+      "answerText": "1-3: हल्का दर्द",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:08.690Z"
+    },
+    {
+      "id": "ANS-KMKLNL8",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_PAIN_SEVERITY",
+      "questionText": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?",
+      "answerText": "1-3: हल्का दर्द",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:08.831Z"
+    },
+    {
+      "id": "ANS-WKZ8HGT",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_PAIN_SEVERITY",
+      "questionText": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?",
+      "answerText": "1-3: हल्का दर्द",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:08.970Z"
+    },
+    {
+      "id": "ANS-IIPLU4S",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_MORNING_STIFFNESS",
+      "questionText": "क्या सुबह सोकर उठने पर जोड़ों में जकड़न (Stiffness) महसूस होती है?",
+      "answerText": "कोई जकड़न नहीं",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:10.861Z"
+    },
+    {
+      "id": "ANS-8YY6QIC",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_MORNING_STIFFNESS",
+      "questionText": "क्या सुबह सोकर उठने पर जोड़ों में जकड़न (Stiffness) महसूस होती है?",
+      "answerText": "कोई जकड़न नहीं",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:10.950Z"
+    },
+    {
+      "id": "ANS-7B82VHP",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_AGGRAVATING_FACTORS",
+      "questionText": "किन चीजों से आपका दर्द या जकड़न बढ़ जाती है?",
+      "answerText": "ठंडा मौसम / ठंडी हवा",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:11.286Z"
+    },
+    {
+      "id": "ANS-9W85RJ5",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_AGGRAVATING_FACTORS",
+      "questionText": "किन चीजों से आपका दर्द या जकड़न बढ़ जाती है?",
+      "answerText": "ठंडा मौसम / ठंडी हवा",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:11.396Z"
+    },
+    {
+      "id": "ANS-PCLY503",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_RELIEVING_FACTORS",
+      "questionText": "किस उपाय से आपको आराम मिलता है?",
+      "answerText": "गर्म सिकाई या तेल की मालिश",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:11.835Z"
+    },
+    {
+      "id": "ANS-T9MTR4M",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_RELIEVING_FACTORS",
+      "questionText": "किस उपाय से आपको आराम मिलता है?",
+      "answerText": "गर्म सिकाई या तेल की मालिश",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:12.026Z"
+    },
+    {
+      "id": "ANS-W8D4U7P",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_CREPITUS_SWELLING",
+      "questionText": "क्या जोड़ों से कट-कट की आवाज आती है या सूजन दिखाई देती है?",
+      "answerText": "केवल कट-कट की आवाज (संधि स्फुटन)",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:12.100Z"
+    },
+    {
+      "id": "ANS-A0HZUBB",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_BODY_FRAME",
+      "questionText": "आपकी स्वाभाविक शारीरिक बनावट कैसी है?",
+      "answerText": "पतला-दुबला, हड्डियां उभरी हुई, वजन मुश्किल से बढ़ना",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:12.336Z"
+    },
+    {
+      "id": "ANS-C7SZGT7",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_SKIN_HAIR",
+      "questionText": "आपकी त्वचा और बालों की प्रकृति कैसी है?",
+      "answerText": "रूखी, शुष्क त्वचा, फटी एड़ियां, सूखे बाल",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:12.902Z"
+    },
+    {
+      "id": "ANS-XEOJLA6",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_SKIN_HAIR",
+      "questionText": "आपकी त्वचा और बालों की प्रकृति कैसी है?",
+      "answerText": "रूखी, शुष्क त्वचा, फटी एड़ियां, सूखे बाल",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:13.003Z"
+    },
+    {
+      "id": "ANS-U6O63R2",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_APPETITE_AGNI",
+      "questionText": "आपकी भूख (अग्नि) और पाचन की स्थिति कैसी है?",
+      "answerText": "अनियमित: कभी बहुत तेज भूख, कभी बिल्कुल नहीं (विषमाग्नि)",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:13.207Z"
+    },
+    {
+      "id": "ANS-HEO92SE",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_BOWEL_KOSHTHA",
+      "questionText": "आपका पेट साफ होने का पैटर्न (कोष्ठ) कैसा है?",
+      "answerText": "कड़ा / कब्ज: मल सूखा, पेट साफ होने में कठिनाई (क्रूर कोष्ठ)",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:13.783Z"
+    },
+    {
+      "id": "ANS-8MD2Z9K",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_BOWEL_KOSHTHA",
+      "questionText": "आपका पेट साफ होने का पैटर्न (कोष्ठ) कैसा है?",
+      "answerText": "कड़ा / कब्ज: मल सूखा, पेट साफ होने में कठिनाई (क्रूर कोष्ठ)",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:13.941Z"
+    },
+    {
+      "id": "ANS-OEI5BG6",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_SLEEP_MENTAL",
+      "questionText": "आपकी नींद और तनाव में मन की स्थिति कैसी रहती है?",
+      "answerText": "हल्की नींद, जल्दी टूटना, बेचैन मन, चिंता की प्रवृत्ति",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:11:16.004Z"
+    },
+    {
+      "id": "ANS-RCULNB9",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_KNEE_LOC",
+      "questionText": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?",
+      "answerText": "दोनों घुटने",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:12:18.758Z"
+    },
+    {
+      "id": "ANS-22NWTCF",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_KNEE_LOC",
+      "questionText": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?",
+      "answerText": "दोनों घुटने",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:12:18.856Z"
+    },
+    {
+      "id": "ANS-UHTFIZI",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_PAIN_SEVERITY",
+      "questionText": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?",
+      "answerText": "1-3: हल्का दर्द",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:12:18.994Z"
+    },
+    {
+      "id": "ANS-I0OLGS2",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_MORNING_STIFFNESS",
+      "questionText": "क्या सुबह सोकर उठने पर जोड़ों में जकड़न (Stiffness) महसूस होती है?",
+      "answerText": "कोई जकड़न नहीं",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:12:19.913Z"
+    },
+    {
+      "id": "ANS-B96UHGJ",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_AGGRAVATING_FACTORS",
+      "questionText": "किन चीजों से आपका दर्द या जकड़न बढ़ जाती है?",
+      "answerText": "ठंडा मौसम / ठंडी हवा",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:12:20.807Z"
+    },
+    {
+      "id": "ANS-6RXK4YD",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_RELIEVING_FACTORS",
+      "questionText": "किस उपाय से आपको आराम मिलता है?",
+      "answerText": "गर्म सिकाई या तेल की मालिश",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:12:21.641Z"
+    },
+    {
+      "id": "ANS-PJ7HEDD",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_CREPITUS_SWELLING",
+      "questionText": "क्या जोड़ों से कट-कट की आवाज आती है या सूजन दिखाई देती है?",
+      "answerText": "केवल कट-कट की आवाज (संधि स्फुटन)",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:12:22.089Z"
+    },
+    {
+      "id": "ANS-ZQQX2EZ",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_KNEE_LOC",
+      "questionText": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?",
+      "answerText": "दोनों घुटने",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:30:59.534Z"
+    },
+    {
+      "id": "ANS-HZWKH4L",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_PAIN_SEVERITY",
+      "questionText": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?",
+      "answerText": "1-3: हल्का दर्द",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:31:00.972Z"
+    },
+    {
+      "id": "ANS-HDQ1MSS",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_MORNING_STIFFNESS",
+      "questionText": "क्या सुबह सोकर उठने पर जोड़ों में जकड़न (Stiffness) महसूस होती है?",
+      "answerText": "कोई जकड़न नहीं",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:31:25.010Z"
+    },
+    {
+      "id": "ANS-GVQ814A",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_AGGRAVATING_FACTORS",
+      "questionText": "किन चीजों से आपका दर्द या जकड़न बढ़ जाती है?",
+      "answerText": "ठंडा मौसम / ठंडी हवा",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:31:25.767Z"
+    },
+    {
+      "id": "ANS-671EUYJ",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_RELIEVING_FACTORS",
+      "questionText": "किस उपाय से आपको आराम मिलता है?",
+      "answerText": "गर्म सिकाई या तेल की मालिश",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:31:26.818Z"
+    },
+    {
+      "id": "ANS-O7EPDO7",
+      "sessionId": "SES-HERO-01",
+      "questionId": "Q_CREPITUS_SWELLING",
+      "questionText": "क्या जोड़ों से कट-कट की आवाज आती है या सूजन दिखाई देती है?",
+      "answerText": "केवल कट-कट की आवाज (संधि स्फुटन)",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:31:27.549Z"
+    },
+    {
+      "id": "ANS-35NVE1A",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_BODY_FRAME",
+      "questionText": "आपकी स्वाभाविक शारीरिक बनावट कैसी है?",
+      "answerText": "पतला-दुबला, हड्डियां उभरी हुई, वजन मुश्किल से बढ़ना",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:31:28.207Z"
+    },
+    {
+      "id": "ANS-8K00X2C",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_SKIN_HAIR",
+      "questionText": "आपकी त्वचा और बालों की प्रकृति कैसी है?",
+      "answerText": "रूखी, शुष्क त्वचा, फटी एड़ियां, सूखे बाल",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:31:28.605Z"
+    },
+    {
+      "id": "ANS-694XHSS",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_APPETITE_AGNI",
+      "questionText": "आपकी भूख (अग्नि) और पाचन की स्थिति कैसी है?",
+      "answerText": "अनियमित: कभी बहुत तेज भूख, कभी बिल्कुल नहीं (विषमाग्नि)",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:31:29.388Z"
+    },
+    {
+      "id": "ANS-A0KUXR5",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_BOWEL_KOSHTHA",
+      "questionText": "आपका पेट साफ होने का पैटर्न (कोष्ठ) कैसा है?",
+      "answerText": "कड़ा / कब्ज: मल सूखा, पेट साफ होने में कठिनाई (क्रूर कोष्ठ)",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:31:31.112Z"
+    },
+    {
+      "id": "ANS-M9KMH1F",
+      "sessionId": "SES-HERO-01",
+      "questionId": "PQ_SLEEP_MENTAL",
+      "questionText": "आपकी नींद और तनाव में मन की स्थिति कैसी रहती है?",
+      "answerText": "हल्की नींद, जल्दी टूटना, बेचैन मन, चिंता की प्रवृत्ति",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:32:42.020Z"
+    },
+    {
+      "id": "ANS-LPCHKI0",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_KNEE_LOC",
+      "questionText": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?",
+      "answerText": "दोनों घुटने",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:33:19.664Z"
+    },
+    {
+      "id": "ANS-5VI3ZUL",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_PAIN_SEVERITY",
+      "questionText": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?",
+      "answerText": "1-3: हल्का दर्द",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:33:19.921Z"
+    },
+    {
+      "id": "ANS-NW0R4YF",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_MORNING_STIFFNESS",
+      "questionText": "क्या सुबह सोकर उठने पर जोड़ों में जकड़न (Stiffness) महसूस होती है?",
+      "answerText": "कोई जकड़न नहीं",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:33:20.311Z"
+    },
+    {
+      "id": "ANS-6VML3OC",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_AGGRAVATING_FACTORS",
+      "questionText": "किन चीजों से आपका दर्द या जकड़न बढ़ जाती है?",
+      "answerText": "ठंडा मौसम / ठंडी हवा",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:33:20.879Z"
+    },
+    {
+      "id": "ANS-63NR0SU",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_RELIEVING_FACTORS",
+      "questionText": "किस उपाय से आपको आराम मिलता है?",
+      "answerText": "गर्म सिकाई या तेल की मालिश",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:33:23.074Z"
+    },
+    {
+      "id": "ANS-UIM10VC",
+      "sessionId": "SES-EMERG-02",
+      "questionId": "Q_CREPITUS_SWELLING",
+      "questionText": "क्या जोड़ों से कट-कट की आवाज आती है या सूजन दिखाई देती है?",
+      "answerText": "केवल कट-कट की आवाज (संधि स्फुटन)",
+      "inputMode": "TOUCH",
+      "confidence": 1,
+      "redFlagFlagged": false,
+      "provenance": "PATIENT_TOUCH",
+      "timestamp": "2026-08-29T16:33:24.599Z"
+    }
+  ],
+  "ayushAssessments": [
+    {
+      "id": "AYUSH-001",
+      "sessionId": "SES-HERO-01",
+      "prakriti": {
+        "vata": 55,
+        "pitta": 30,
+        "kapha": 15,
+        "dominant": "VATA_PITTA"
+      },
+      "vikriti": {
+        "imbalance": "Vata-Kapha Vriddhi with Dhatukshaya & Avarana at Janu Sandhi",
+        "severity": "MODERATE"
+      },
+      "dashavidha": {
+        "sara": "MADHYAMA",
+        "samhanana": "MADHYAMA",
+        "pramana": "MADHYAMA",
+        "satmya": "MADHYAMA",
+        "sattva": "MADHYAMA",
+        "aharaShakti": "AVARA",
+        "vyayamaShakti": "AVARA",
+        "vaya": "VRIDDHA"
+      },
+      "agni": "MANDAGNI",
+      "koshtha": "KRURA",
+      "ahara": "Vegetarian, preference for warm cooked food, irregular meal timings, occasional dry snacks",
+      "vihara": "Sedentary, minimal brisk walking due to knee pain, disturbed sleep due to joint aching",
+      "nidana": [
+        "Vatakara Ahara (dry/cold food)",
+        "Ativyayama / Stair climbing history",
+        "Aging (Vaya-janya Vata Vriddhi)",
+        "Irregular food timings (Vishamashana)"
+      ],
+      "sampraptiSummary": "Prakupita Vata localizes in Janu Sandhi (Khavaigunya) causing Shoola (pain), Shopha (crepitus/mild swelling), and Stambha (stiffness) consistent with Sandhivata (Osteoarthritis)."
+    }
+  ],
+  "documents": [
+    {
+      "id": "DOC-001",
+      "patientId": "PAT-HERO-01",
+      "fileName": "AIIA_Discharge_Summary_2025-11-12.pdf",
+      "fileType": "DISCHARGE_SUMMARY",
+      "fileSize": 428000,
+      "fileUrl": "/demo_docs/AIIA_Discharge_Summary_2025-11-12.pdf",
+      "uploadedAt": "2026-08-28T08:18:00Z",
+      "isDemo": true,
+      "status": "VERIFIED"
+    },
+    {
+      "id": "DOC-002",
+      "patientId": "PAT-HERO-01",
+      "fileName": "City_PathLab_CBC_Report_2026-07-03.pdf",
+      "fileType": "LAB_REPORT",
+      "fileSize": 215000,
+      "fileUrl": "/demo_docs/City_PathLab_CBC_Report_2026-07-03.pdf",
+      "uploadedAt": "2026-08-28T08:19:00Z",
+      "isDemo": true,
+      "status": "VERIFIED"
+    },
+    {
+      "id": "DOC-003",
+      "patientId": "PAT-HERO-01",
+      "fileName": "OPD_Prescription_Card_2026-06-15.pdf",
+      "fileType": "PRESCRIPTION",
+      "fileSize": 185000,
+      "fileUrl": "/demo_docs/OPD_Prescription_Card_2026-06-15.pdf",
+      "uploadedAt": "2026-08-28T08:20:00Z",
+      "isDemo": true,
+      "status": "VERIFIED"
+    }
+  ],
+  "documentOcrResults": [
+    {
+      "id": "OCR-001",
+      "documentId": "DOC-001",
+      "rawText": "ALL INDIA INSTITUTE OF AYURVEDA (AIIA)\nDepartment of Kayachikitsa - Discharge Summary\nPatient: Smt. Radha Sharma | Age: 57 F | IPD No: IP-2025-8841\nAdmission Date: 05-Nov-2025 | Discharge Date: 12-Nov-2025\nDiagnosis: Essential Hypertension (Controlled), Mild Janu Sandhivata (Bilateral Knee Osteoarthritis)\nTreatment Given: Janu Basti with Mahanarayana Taila, Yogaraj Guggulu 2 tab BD, Amlodipine 5mg OD.\nCondition at Discharge: Stable. BP: 128/84 mmHg. Advice follow up after 6 months.",
+      "confidence": 0.95,
+      "processingTimeMs": 1420,
+      "extractedAt": "2026-08-28T08:18:02Z"
+    },
+    {
+      "id": "OCR-002",
+      "documentId": "DOC-002",
+      "rawText": "DR. LAL & METROPOLIS CLINICAL PATHOLOGY LAB\nPatient: Radha Sharma (58 F) | Date: 03-Jul-2026 | Ref: Dr. A. Sharma\nCOMPLETE BLOOD COUNT (CBC):\n- Hemoglobin (Hb): 10.2 g/dL [Ref: 12.0 - 15.0 g/dL] (LOW / ABNORMAL)\n- Total WBC Count: 6,800 /cu.mm [Ref: 4,000 - 11,000] (Normal)\n- Platelet Count: 2.2 Lakhs /cu.mm [Ref: 1.5 - 4.5] (Normal)\n- ESR (1st hour): 34 mm/hr [Ref: 0 - 20 mm/hr] (HIGH / ABNORMAL)\n- Fasting Blood Sugar: 98 mg/dL [Ref: 70 - 100 mg/dL] (Normal)",
+      "confidence": 0.97,
+      "processingTimeMs": 980,
+      "extractedAt": "2026-08-28T08:19:02Z"
+    },
+    {
+      "id": "OCR-003",
+      "documentId": "DOC-003",
+      "rawText": "OPD PRESCRIPTION CARD - AYUSH WELLNESS CLINIC\nDate: 15-Jun-2026 | Patient: Radha Sharma\nRx:\n1. Tab Amlodipine 5mg - 1 Tab OD Morning (Oral)\n2. Yogaraj Guggulu - 2 Tab BD with warm water\n3. Shallaki (Boswellia serrata) 500mg - 1 Cap BD after meals\n4. Prasaranyadi Kwatha - 15ml BD with 45ml boiled lukewarm water\nAdvice: Avoid cold foods, curd at night, avoid squatting on floor.",
+      "confidence": 0.94,
+      "processingTimeMs": 1100,
+      "extractedAt": "2026-08-28T08:20:02Z"
+    },
+    {
+      "id": "OCR-CYOYLX3",
+      "documentId": "DOC-001",
+      "rawText": "HOSPITAL MEDICAL SUMMARY\nPatient ID: PAT-EMERG-02\nDiagnosis: Chronic Lumbar Spondylosis (Katishoola), Essential Hypertension\nMedications: Tab Telmisartan 40mg OD, Trayodashanga Guggulu 2 tab BD\nStatus: Stable on discharge.",
+      "confidence": 0.96,
+      "processingTimeMs": 800,
+      "extractedAt": "2026-08-29T16:12:27.448Z"
+    },
+    {
+      "id": "OCR-5VSOB4C",
+      "documentId": "DOC-001",
+      "rawText": "HOSPITAL MEDICAL SUMMARY\nPatient ID: PAT-EMERG-02\nDiagnosis: Chronic Lumbar Spondylosis (Katishoola), Essential Hypertension\nMedications: Tab Telmisartan 40mg OD, Trayodashanga Guggulu 2 tab BD\nStatus: Stable on discharge.",
+      "confidence": 0.96,
+      "processingTimeMs": 800,
+      "extractedAt": "2026-08-29T16:34:53.322Z"
+    }
+  ],
+  "medicalEntities": [
+    {
+      "id": "ENT-001",
+      "documentId": "DOC-001",
+      "patientId": "PAT-HERO-01",
+      "entityType": "DIAGNOSIS",
+      "name": "Essential Hypertension",
+      "confidence": 0.96,
+      "sourceTextSnippet": "Diagnosis: Essential Hypertension (Controlled)",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": true
+    },
+    {
+      "id": "ENT-002",
+      "documentId": "DOC-001",
+      "patientId": "PAT-HERO-01",
+      "entityType": "DIAGNOSIS",
+      "name": "Janu Sandhivata (Bilateral Knee Osteoarthritis)",
+      "confidence": 0.94,
+      "sourceTextSnippet": "Mild Janu Sandhivata (Bilateral Knee Osteoarthritis)",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": true
+    },
+    {
+      "id": "ENT-003",
+      "documentId": "DOC-002",
+      "patientId": "PAT-HERO-01",
+      "entityType": "INVESTIGATION",
+      "name": "Hemoglobin",
+      "value": "10.2",
+      "unit": "g/dL",
+      "referenceRange": "12.0 - 15.0 g/dL",
+      "isAbnormal": true,
+      "abnormalDirection": "LOW",
+      "confidence": 0.98,
+      "sourceTextSnippet": "Hemoglobin (Hb): 10.2 g/dL [Ref: 12.0 - 15.0 g/dL] (LOW)",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": true
+    },
+    {
+      "id": "ENT-004",
+      "documentId": "DOC-002",
+      "patientId": "PAT-HERO-01",
+      "entityType": "INVESTIGATION",
+      "name": "ESR (Erythrocyte Sedimentation Rate)",
+      "value": "34",
+      "unit": "mm/hr",
+      "referenceRange": "0 - 20 mm/hr",
+      "isAbnormal": true,
+      "abnormalDirection": "HIGH",
+      "confidence": 0.97,
+      "sourceTextSnippet": "ESR (1st hour): 34 mm/hr [Ref: 0 - 20 mm/hr] (HIGH)",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": true
+    },
+    {
+      "id": "ENT-005",
+      "documentId": "DOC-003",
+      "patientId": "PAT-HERO-01",
+      "entityType": "MEDICATION",
+      "name": "Amlodipine",
+      "dosage": "5 mg",
+      "frequency": "Once Daily (Morning)",
+      "route": "Oral",
+      "confidence": 0.96,
+      "sourceTextSnippet": "Tab Amlodipine 5mg - 1 Tab OD Morning",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": true
+    },
+    {
+      "id": "ENT-006",
+      "documentId": "DOC-003",
+      "patientId": "PAT-HERO-01",
+      "entityType": "MEDICATION",
+      "name": "Yogaraj Guggulu",
+      "dosage": "2 Tablets (500mg each)",
+      "frequency": "Twice Daily (Morning & Evening)",
+      "route": "Oral with lukewarm water",
+      "confidence": 0.95,
+      "sourceTextSnippet": "Yogaraj Guggulu - 2 Tab BD with warm water",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": true
+    },
+    {
+      "id": "ENT-007",
+      "documentId": "DOC-003",
+      "patientId": "PAT-HERO-01",
+      "entityType": "MEDICATION",
+      "name": "Shallaki (Boswellia serrata)",
+      "dosage": "500 mg",
+      "frequency": "Twice Daily (after meals)",
+      "route": "Oral",
+      "confidence": 0.93,
+      "sourceTextSnippet": "Shallaki (Boswellia serrata) 500mg - 1 Cap BD",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": true
+    },
+    {
+      "id": "ENT-5GECF7S",
+      "documentId": "DOC-001",
+      "patientId": "PAT-EMERG-02",
+      "entityType": "DIAGNOSIS",
+      "name": "Essential Hypertension",
+      "confidence": 0.96,
+      "sourceTextSnippet": "Diagnosis: Chronic Lumbar Spondylosis (Katishoola), Essential Hypertension",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": false
+    },
+    {
+      "id": "ENT-OTPHBDT",
+      "documentId": "DOC-001",
+      "patientId": "PAT-EMERG-02",
+      "entityType": "MEDICATION",
+      "name": "Yogaraj Guggulu",
+      "dosage": "2 Tablets (500mg)",
+      "frequency": "Twice Daily",
+      "route": "Oral with lukewarm water",
+      "confidence": 0.95,
+      "sourceTextSnippet": "Medications: Tab Telmisartan 40mg OD, Trayodashanga Guggulu 2 tab BD",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": false
+    },
+    {
+      "id": "ENT-DLXTDTF",
+      "documentId": "DOC-001",
+      "patientId": "PAT-EMERG-02",
+      "entityType": "DIAGNOSIS",
+      "name": "Essential Hypertension",
+      "confidence": 0.96,
+      "sourceTextSnippet": "Diagnosis: Chronic Lumbar Spondylosis (Katishoola), Essential Hypertension",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": false
+    },
+    {
+      "id": "ENT-9MDTBV0",
+      "documentId": "DOC-001",
+      "patientId": "PAT-EMERG-02",
+      "entityType": "MEDICATION",
+      "name": "Yogaraj Guggulu",
+      "dosage": "2 Tablets (500mg)",
+      "frequency": "Twice Daily",
+      "route": "Oral with lukewarm water",
+      "confidence": 0.95,
+      "sourceTextSnippet": "Medications: Tab Telmisartan 40mg OD, Trayodashanga Guggulu 2 tab BD",
+      "provenance": "OCR_DOCUMENT",
+      "isVerified": false
+    }
+  ],
+  "timelineEvents": [
+    {
+      "id": "TL-001",
+      "patientId": "PAT-HERO-01",
+      "date": "2025-11-12",
+      "title": "Inpatient Discharge — AIIA Kayachikitsa Ward",
+      "category": "DISCHARGE",
+      "institution": "All India Institute of Ayurveda, New Delhi",
+      "description": "Managed for early Janu Sandhivata and BP stabilization. Received Janu Basti therapies.",
+      "keyEntities": [
+        "Hypertension",
+        "Janu Sandhivata",
+        "Janu Basti",
+        "Yogaraj Guggulu"
+      ],
+      "documentId": "DOC-001",
+      "provenance": "OCR_DOCUMENT"
+    },
+    {
+      "id": "TL-002",
+      "patientId": "PAT-HERO-01",
+      "date": "2026-06-15",
+      "title": "Ayush Wellness OPD Follow-up Prescription",
+      "category": "PRESCRIPTION",
+      "institution": "Ayush Wellness Clinic, Ghaziabad",
+      "description": "Prescription renewed: Amlodipine 5mg, Yogaraj Guggulu, Shallaki 500mg, Prasaranyadi Kwatha.",
+      "keyEntities": [
+        "Amlodipine",
+        "Yogaraj Guggulu",
+        "Shallaki",
+        "Prasaranyadi Kwatha"
+      ],
+      "documentId": "DOC-003",
+      "provenance": "OCR_DOCUMENT"
+    },
+    {
+      "id": "TL-003",
+      "patientId": "PAT-HERO-01",
+      "date": "2026-07-03",
+      "title": "Routine CBC Lab Investigation Report",
+      "category": "LAB_TEST",
+      "institution": "City Pathology Diagnostic Centre",
+      "description": "Hb: 10.2 g/dL (Mild Anaemia / Pandu lakshana), ESR: 34 mm/hr (Elevated inflammatory marker).",
+      "keyEntities": [
+        "Hb 10.2 g/dL (Low)",
+        "ESR 34 mm/hr (High)",
+        "FBS 98 mg/dL"
+      ],
+      "documentId": "DOC-002",
+      "provenance": "OCR_DOCUMENT"
+    },
+    {
+      "id": "TL-004",
+      "patientId": "PAT-HERO-01",
+      "date": "2026-08-28",
+      "title": "MediKiosk Pre-Consultation Case-Taking & Intake",
+      "category": "AYUSH_INTAKE",
+      "institution": "AIIA OPD Kiosk Terminal #03",
+      "description": "AI-assisted clinical intake completed in Hindi. Vata-Kapha Prakriti, Agnimandya, Bilateral knee pain (VAS 6/10).",
+      "keyEntities": [
+        "Sandhivata",
+        "Vishamagni",
+        "Krura Koshtha",
+        "Vata-Kapha"
+      ],
+      "provenance": "AI_INFERENCE"
+    }
+  ],
+  "abdmRecords": [
+    {
+      "id": "ABDM-001",
+      "patientId": "PAT-HERO-01",
+      "resourceType": "DiagnosticReport",
+      "hipName": "AIIA Central Diagnostic Laboratory (HIP-IN-00192)",
+      "hipId": "IN0710000019",
+      "recordDate": "2026-07-03",
+      "isSimulated": true,
+      "fhirJson": {
+        "resourceType": "DiagnosticReport",
+        "id": "dr-cb-20260703-01",
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
+                "code": "LAB"
+              }
+            ]
+          }
+        ],
+        "code": {
+          "text": "Complete Blood Count (CBC) with ESR"
+        },
+        "subject": {
+          "reference": "Patient/MK-PAT-2026-000124",
+          "display": "Smt. Radha Sharma"
+        },
+        "effectiveDateTime": "2026-07-03T10:30:00+05:30",
+        "result": [
+          {
+            "display": "Hemoglobin: 10.2 g/dL (Below Normal)"
+          },
+          {
+            "display": "ESR: 34 mm/hr (Above Normal)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ABDM-002",
+      "patientId": "PAT-HERO-01",
+      "resourceType": "MedicationRequest",
+      "hipName": "Govt. Ayush Wellness Dispensary (HIP-IN-00441)",
+      "hipId": "IN0710000044",
+      "recordDate": "2026-06-15",
+      "isSimulated": true,
+      "fhirJson": {
+        "resourceType": "MedicationRequest",
+        "id": "mr-20260615-02",
+        "status": "active",
+        "intent": "order",
+        "medicationCodeableConcept": {
+          "text": "Amlodipine 5mg Tablet + Yogaraj Guggulu 500mg"
+        },
+        "subject": {
+          "reference": "Patient/MK-PAT-2026-000124"
+        },
+        "authoredOn": "2026-06-15"
+      }
+    }
+  ],
+  "aiSummaries": [
+    {
+      "id": "SUM-3LFKNLZ",
+      "sessionId": "SES-EMERG-02",
+      "patientId": "PAT-EMERG-02",
+      "version": 2,
+      "status": "PHYSICIAN_VERIFIED",
+      "patientSnapshot": "62-year-old male presenting with दोनों घुटने. Underlying essential hypertension on regular therapy and mild digestive irregularity.",
+      "chiefComplaint": "दोनों घुटने",
+      "historyOfPresentIllness": "Patient reports insidious onset of bilateral knee discomfort for the past 6 months. Symptoms are characterized by deep aching and morning stiffness lasting ~30-45 minutes. Aggravated by cold weather, climbing stairs, and prolonged standing. Partially relieved by warm oil application and rest. Associated with audible crepitus during bending.",
+      "relevantPastHistory": [
+        "Known history of Essential Hypertension"
+      ],
+      "surgicalHistory": [
+        "No prior major surgeries reported."
+      ],
+      "medicationHistory": [
+        {
+          "name": "Yogaraj Guggulu",
+          "dose": "2 Tablets (500mg)",
+          "freq": "Twice Daily",
+          "source": "OCR Document Extraction",
+          "confidence": 0.95
+        }
+      ],
+      "allergies": [
+        {
+          "allergen": "Sulfa Drugs",
+          "severity": "MODERATE",
+          "reaction": "Skin rash and itching (Self-reported)"
+        }
+      ],
+      "familyHistory": [
+        "Mother had history of chronic joint pains (Sandhigata Vata)",
+        "Father had history of Hypertension"
+      ],
+      "personalHistory": {
+        "diet": "Vegetarian, prefers warm cooked meals, irregular timings (Vishamashana)",
+        "sleep": "Disturbed sleep due to joint aching (approx 5-6 hours/night)",
+        "bowel": "Irregular, hard stools, tendency towards constipation (Krura Koshtha)",
+        "bladder": "Regular, 4-5 times/day, no nocturia",
+        "appetite": "Sluggish / variable (Mandagni / Vishamagni)",
+        "substances": "None. Non-smoker, non-alcoholic.",
+        "physicalActivity": "Sedentary due to bilateral knee stiffness."
+      },
+      "reviewOfSystems": {
+        "Musculoskeletal": "Bilateral knee joint pain, crepitus, morning stiffness (30-45 min). No small joint involvement.",
+        "Cardiovascular": "Controlled blood pressure (128/84 mmHg). No chest pain, palpitations, or orthopnea.",
+        "Respiratory": "No cough, breathlessness, or wheezing.",
+        "Gastrointestinal": "Post-meal bloating and constipation. No acid regurgitation or hematemesis.",
+        "Neurological": "No dizziness, focal weakness, or sensory deficits."
+      },
+      "previousInvestigations": [
+        {
+          "test": "Hemoglobin (CBC)",
+          "value": "10.2 g/dL",
+          "date": "2026-07-03",
+          "isAbnormal": true
+        },
+        {
+          "test": "ESR (1st Hour)",
+          "value": "34 mm/hr",
+          "date": "2026-07-03",
+          "isAbnormal": true
+        },
+        {
+          "test": "Fasting Blood Sugar",
+          "value": "98 mg/dL",
+          "date": "2026-07-03",
+          "isAbnormal": false
+        }
+      ],
+      "ayushAssessmentSummary": "Vata-Kapha Prakriti with Mandagni and Krura Koshtha. Signs consistent with Janu Sandhivata.",
+      "redFlagsDetected": [],
+      "missingInformation": [
+        "Recent X-Ray Bilateral Knees (Standing AP/Lateral) pending",
+        "Serum Uric Acid and Rheumatoid Factor (RF / Anti-CCP) recommended"
+      ],
+      "confidenceOverall": 0.95,
+      "provenanceSummary": [
+        {
+          "fact": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?: दोनों घुटने",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?: दोनों घुटने",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?: 1-3: हल्का दर्द",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "क्या सुबह सोकर उठने पर जोड़ों में जकड़न (Stiffness) महसूस होती है?: कोई जकड़न नहीं",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "किन चीजों से आपका दर्द या जकड़न बढ़ जाती है?: ठंडा मौसम / ठंडी हवा",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "किस उपाय से आपको आराम मिलता है?: गर्म सिकाई या तेल की मालिश",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "क्या जोड़ों से कट-कट की आवाज आती है या सूजन दिखाई देती है?: केवल कट-कट की आवाज (संधि स्फुटन)",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?: दोनों घुटने",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?: 1-3: हल्का दर्द",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "क्या सुबह सोकर उठने पर जोड़ों में जकड़न (Stiffness) महसूस होती है?: कोई जकड़न नहीं",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "किन चीजों से आपका दर्द या जकड़न बढ़ जाती है?: ठंडा मौसम / ठंडी हवा",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "किस उपाय से आपको आराम मिलता है?: गर्म सिकाई या तेल की मालिश",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "क्या जोड़ों से कट-कट की आवाज आती है या सूजन दिखाई देती है?: केवल कट-कट की आवाज (संधि स्फुटन)",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "DIAGNOSIS: Essential Hypertension ",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.96
+        },
+        {
+          "fact": "MEDICATION: Yogaraj Guggulu 2 Tablets (500mg)",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.95
+        },
+        {
+          "fact": "DIAGNOSIS: Essential Hypertension ",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.96
+        },
+        {
+          "fact": "MEDICATION: Yogaraj Guggulu 2 Tablets (500mg)",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.95
+        }
+      ],
+      "createdAt": "2026-08-29T16:35:40.009Z",
+      "physicianVerifiedAt": "2026-08-29T16:37:13.057Z",
+      "verifiedByDoctorId": "USR-DOC-01",
+      "doctorNotes": "History and joint stiffness verified in person with patient Radha Sharma."
+    },
+    {
+      "id": "SUM-1N52VOZ",
+      "sessionId": "SES-HERO-01",
+      "patientId": "PAT-HERO-01",
+      "version": 1,
+      "status": "DRAFT_AI",
+      "patientSnapshot": "58-year-old female presenting with Bilateral knee joint pain, morning stiffness for 6 months, and mild post-meal bloating.. Underlying essential hypertension on regular therapy and mild digestive irregularity.",
+      "chiefComplaint": "Bilateral knee joint pain, morning stiffness for 6 months, and mild post-meal bloating.",
+      "historyOfPresentIllness": "Patient reports insidious onset of bilateral knee discomfort for the past 6 months. Symptoms are characterized by deep aching and morning stiffness lasting ~30-45 minutes. Aggravated by cold weather, climbing stairs, and prolonged standing. Partially relieved by warm oil application and rest. Associated with audible crepitus during bending.",
+      "relevantPastHistory": [
+        "Known history of Essential Hypertension",
+        "Known history of Janu Sandhivata (Bilateral Knee Osteoarthritis)"
+      ],
+      "surgicalHistory": [
+        "No prior major surgeries reported."
+      ],
+      "medicationHistory": [
+        {
+          "name": "Amlodipine",
+          "dose": "5 mg",
+          "freq": "OD Morning",
+          "source": "Patient Self-Report (VOICE)",
+          "confidence": 0.95
+        },
+        {
+          "name": "Yogaraj Guggulu",
+          "dose": "2 Tablets (500mg each)",
+          "freq": "Twice Daily (Morning & Evening)",
+          "source": "OCR Document Extraction",
+          "confidence": 0.95
+        },
+        {
+          "name": "Shallaki (Boswellia serrata)",
+          "dose": "500 mg",
+          "freq": "Twice Daily (after meals)",
+          "source": "OCR Document Extraction",
+          "confidence": 0.93
+        }
+      ],
+      "allergies": [
+        {
+          "allergen": "Sulfa Drugs",
+          "severity": "MODERATE",
+          "reaction": "Skin rash and itching (Self-reported)"
+        }
+      ],
+      "familyHistory": [
+        "Mother had history of chronic joint pains (Sandhigata Vata)",
+        "Father had history of Hypertension"
+      ],
+      "personalHistory": {
+        "diet": "Vegetarian, prefers warm cooked meals, irregular timings (Vishamashana)",
+        "sleep": "Disturbed sleep due to joint aching (approx 5-6 hours/night)",
+        "bowel": "Irregular, hard stools, tendency towards constipation (Krura Koshtha)",
+        "bladder": "Regular, 4-5 times/day, no nocturia",
+        "appetite": "Sluggish / variable (Mandagni / Vishamagni)",
+        "substances": "None. Non-smoker, non-alcoholic.",
+        "physicalActivity": "Sedentary due to bilateral knee stiffness."
+      },
+      "reviewOfSystems": {
+        "Musculoskeletal": "Bilateral knee joint pain, crepitus, morning stiffness (30-45 min). No small joint involvement.",
+        "Cardiovascular": "Controlled blood pressure (128/84 mmHg). No chest pain, palpitations, or orthopnea.",
+        "Respiratory": "No cough, breathlessness, or wheezing.",
+        "Gastrointestinal": "Post-meal bloating and constipation. No acid regurgitation or hematemesis.",
+        "Neurological": "No dizziness, focal weakness, or sensory deficits."
+      },
+      "previousInvestigations": [
+        {
+          "test": "Hemoglobin",
+          "value": "10.2 g/dL",
+          "date": "2026-07-03",
+          "isAbnormal": true
+        },
+        {
+          "test": "ESR (Erythrocyte Sedimentation Rate)",
+          "value": "34 mm/hr",
+          "date": "2026-07-03",
+          "isAbnormal": true
+        }
+      ],
+      "ayushAssessmentSummary": "Prakriti: VATA_PITTA (Vata: 55%, Pitta: 30%, Kapha: 15%). Agni: MANDAGNI. Koshtha: KRURA. Doshic Imbalance: Vata-Kapha Vriddhi with Dhatukshaya & Avarana at Janu Sandhi. Samprapti: Prakupita Vata localizes in Janu Sandhi (Khavaigunya) causing Shoola (pain), Shopha (crepitus/mild swelling), and Stambha (stiffness) consistent with Sandhivata (Osteoarthritis).",
+      "redFlagsDetected": [],
+      "missingInformation": [
+        "Recent X-Ray Bilateral Knees (Standing AP/Lateral) pending",
+        "Serum Uric Acid and Rheumatoid Factor (RF / Anti-CCP) recommended"
+      ],
+      "confidenceOverall": 0.95,
+      "provenanceSummary": [
+        {
+          "fact": "Tell me what brings you to the hospital today. / आज आप किस तकलीफ के लिए आए हैं?: Mujhe dono ghutno me pichhle 6 mahine se dard aur subah jakdan rehti hai. Sath hi khana khane ke baad pet me bhari-pan aur gas banti hai.",
+          "source": "PATIENT_VOICE",
+          "confidence": 0.96
+        },
+        {
+          "fact": "How severe is the joint pain on a daily basis?: Moderate to Severe (Score: 6/10), worsens while climbing stairs and during cold weather.",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "Do you experience morning stiffness, and for how long?: Yes, about 30 to 45 minutes every morning (Sandhi Stambha).",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "How is your appetite and bowel habit? (Agni & Koshtha assessment): Appetite is irregular (Vishamagni). Irregular bowel movements, prone to constipation and dry stools.",
+          "source": "PATIENT_VOICE",
+          "confidence": 0.94
+        },
+        {
+          "fact": "Are you currently taking any regular medications?: Tab Amlodipine 5mg once daily for Hypertension. Occasionally Tab Paracetamol 650mg for knee pain relief.",
+          "source": "PATIENT_VOICE",
+          "confidence": 0.95
+        },
+        {
+          "fact": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?: दोनों घुटने",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?: दोनों घुटने",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?: 1-3: हल्का दर्द",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?: 1-3: हल्का दर्द",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?: 1-3: हल्का दर्द",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "क्या सुबह सोकर उठने पर जोड़ों में जकड़न (Stiffness) महसूस होती है?: कोई जकड़न नहीं",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "क्या सुबह सोकर उठने पर जोड़ों में जकड़न (Stiffness) महसूस होती है?: कोई जकड़न नहीं",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "किन चीजों से आपका दर्द या जकड़न बढ़ जाती है?: ठंडा मौसम / ठंडी हवा",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "किन चीजों से आपका दर्द या जकड़न बढ़ जाती है?: ठंडा मौसम / ठंडी हवा",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "किस उपाय से आपको आराम मिलता है?: गर्म सिकाई या तेल की मालिश",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "किस उपाय से आपको आराम मिलता है?: गर्म सिकाई या तेल की मालिश",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "क्या जोड़ों से कट-कट की आवाज आती है या सूजन दिखाई देती है?: केवल कट-कट की आवाज (संधि स्फुटन)",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "आपकी स्वाभाविक शारीरिक बनावट कैसी है?: पतला-दुबला, हड्डियां उभरी हुई, वजन मुश्किल से बढ़ना",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "आपकी त्वचा और बालों की प्रकृति कैसी है?: रूखी, शुष्क त्वचा, फटी एड़ियां, सूखे बाल",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "आपकी त्वचा और बालों की प्रकृति कैसी है?: रूखी, शुष्क त्वचा, फटी एड़ियां, सूखे बाल",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "आपकी भूख (अग्नि) और पाचन की स्थिति कैसी है?: अनियमित: कभी बहुत तेज भूख, कभी बिल्कुल नहीं (विषमाग्नि)",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "आपका पेट साफ होने का पैटर्न (कोष्ठ) कैसा है?: कड़ा / कब्ज: मल सूखा, पेट साफ होने में कठिनाई (क्रूर कोष्ठ)",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "आपका पेट साफ होने का पैटर्न (कोष्ठ) कैसा है?: कड़ा / कब्ज: मल सूखा, पेट साफ होने में कठिनाई (क्रूर कोष्ठ)",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "आपकी नींद और तनाव में मन की स्थिति कैसी रहती है?: हल्की नींद, जल्दी टूटना, बेचैन मन, चिंता की प्रवृत्ति",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "DIAGNOSIS: Essential Hypertension ",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.96
+        },
+        {
+          "fact": "DIAGNOSIS: Janu Sandhivata (Bilateral Knee Osteoarthritis) ",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.94
+        },
+        {
+          "fact": "INVESTIGATION: Hemoglobin 10.2",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.98
+        },
+        {
+          "fact": "INVESTIGATION: ESR (Erythrocyte Sedimentation Rate) 34",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.97
+        },
+        {
+          "fact": "MEDICATION: Amlodipine 5 mg",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.96
+        },
+        {
+          "fact": "MEDICATION: Yogaraj Guggulu 2 Tablets (500mg each)",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.95
+        },
+        {
+          "fact": "MEDICATION: Shallaki (Boswellia serrata) 500 mg",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.93
+        },
+        {
+          "fact": "ABDM DiagnosticReport from AIIA Central Diagnostic Laboratory (HIP-IN-00192)",
+          "source": "ABDM_FHIR",
+          "confidence": 0.99
+        },
+        {
+          "fact": "ABDM MedicationRequest from Govt. Ayush Wellness Dispensary (HIP-IN-00441)",
+          "source": "ABDM_FHIR",
+          "confidence": 0.99
+        }
+      ],
+      "createdAt": "2026-08-29T16:21:56.105Z"
+    },
+    {
+      "id": "SUM-1X8SV1C",
+      "sessionId": "SES-DOCS-03",
+      "patientId": "PAT-DOCS-03",
+      "version": 1,
+      "status": "DRAFT_AI",
+      "patientSnapshot": "52-year-old female presenting with Joint discomfort and routine OPD intake. Underlying essential hypertension on regular therapy and mild digestive irregularity.",
+      "chiefComplaint": "Joint discomfort and routine OPD intake",
+      "historyOfPresentIllness": "Patient reports insidious onset of bilateral knee discomfort for the past 6 months. Symptoms are characterized by deep aching and morning stiffness lasting ~30-45 minutes. Aggravated by cold weather, climbing stairs, and prolonged standing. Partially relieved by warm oil application and rest. Associated with audible crepitus during bending.",
+      "relevantPastHistory": [
+        "Essential Hypertension (controlled on medication)",
+        "No history of Diabetes Mellitus or Major Cardiac Illness"
+      ],
+      "surgicalHistory": [
+        "No prior major surgeries reported."
+      ],
+      "medicationHistory": [
+        {
+          "name": "Amlodipine",
+          "dose": "5 mg",
+          "freq": "OD Morning",
+          "source": "Patient Voice / OCR",
+          "confidence": 0.96
+        }
+      ],
+      "allergies": [
+        {
+          "allergen": "Sulfa Drugs",
+          "severity": "MODERATE",
+          "reaction": "Skin rash and itching (Self-reported)"
+        }
+      ],
+      "familyHistory": [
+        "Mother had history of chronic joint pains (Sandhigata Vata)",
+        "Father had history of Hypertension"
+      ],
+      "personalHistory": {
+        "diet": "Vegetarian, prefers warm cooked meals, irregular timings (Vishamashana)",
+        "sleep": "Disturbed sleep due to joint aching (approx 5-6 hours/night)",
+        "bowel": "Irregular, hard stools, tendency towards constipation (Krura Koshtha)",
+        "bladder": "Regular, 4-5 times/day, no nocturia",
+        "appetite": "Sluggish / variable (Mandagni / Vishamagni)",
+        "substances": "None. Non-smoker, non-alcoholic.",
+        "physicalActivity": "Sedentary due to bilateral knee stiffness."
+      },
+      "reviewOfSystems": {
+        "Musculoskeletal": "Bilateral knee joint pain, crepitus, morning stiffness (30-45 min). No small joint involvement.",
+        "Cardiovascular": "Controlled blood pressure (128/84 mmHg). No chest pain, palpitations, or orthopnea.",
+        "Respiratory": "No cough, breathlessness, or wheezing.",
+        "Gastrointestinal": "Post-meal bloating and constipation. No acid regurgitation or hematemesis.",
+        "Neurological": "No dizziness, focal weakness, or sensory deficits."
+      },
+      "previousInvestigations": [
+        {
+          "test": "Hemoglobin (CBC)",
+          "value": "10.2 g/dL",
+          "date": "2026-07-03",
+          "isAbnormal": true
+        },
+        {
+          "test": "ESR (1st Hour)",
+          "value": "34 mm/hr",
+          "date": "2026-07-03",
+          "isAbnormal": true
+        },
+        {
+          "test": "Fasting Blood Sugar",
+          "value": "98 mg/dL",
+          "date": "2026-07-03",
+          "isAbnormal": false
+        }
+      ],
+      "ayushAssessmentSummary": "Vata-Kapha Prakriti with Mandagni and Krura Koshtha. Signs consistent with Janu Sandhivata.",
+      "redFlagsDetected": [],
+      "missingInformation": [
+        "Recent X-Ray Bilateral Knees (Standing AP/Lateral) pending",
+        "Serum Uric Acid and Rheumatoid Factor (RF / Anti-CCP) recommended"
+      ],
+      "confidenceOverall": 0.95,
+      "provenanceSummary": [],
+      "createdAt": "2026-08-29T16:19:25.509Z"
+    },
+    {
+      "id": "SUM-1NHIABG",
+      "sessionId": "SES-EMERG-02",
+      "patientId": "PAT-EMERG-02",
+      "version": 2,
+      "status": "PHYSICIAN_VERIFIED",
+      "patientSnapshot": "62-year-old male presenting with दोनों घुटने. Underlying essential hypertension on regular therapy and mild digestive irregularity.",
+      "chiefComplaint": "दोनों घुटने",
+      "historyOfPresentIllness": "Patient reports insidious onset of bilateral knee discomfort for the past 6 months. Symptoms are characterized by deep aching and morning stiffness lasting ~30-45 minutes. Aggravated by cold weather, climbing stairs, and prolonged standing. Partially relieved by warm oil application and rest. Associated with audible crepitus during bending.",
+      "relevantPastHistory": [
+        "Known history of Essential Hypertension"
+      ],
+      "surgicalHistory": [
+        "No prior major surgeries reported."
+      ],
+      "medicationHistory": [
+        {
+          "name": "Yogaraj Guggulu",
+          "dose": "2 Tablets (500mg)",
+          "freq": "Twice Daily",
+          "source": "OCR Document Extraction",
+          "confidence": 0.95
+        }
+      ],
+      "allergies": [
+        {
+          "allergen": "Sulfa Drugs",
+          "severity": "MODERATE",
+          "reaction": "Skin rash and itching (Self-reported)"
+        }
+      ],
+      "familyHistory": [
+        "Mother had history of chronic joint pains (Sandhigata Vata)",
+        "Father had history of Hypertension"
+      ],
+      "personalHistory": {
+        "diet": "Vegetarian, prefers warm cooked meals, irregular timings (Vishamashana)",
+        "sleep": "Disturbed sleep due to joint aching (approx 5-6 hours/night)",
+        "bowel": "Irregular, hard stools, tendency towards constipation (Krura Koshtha)",
+        "bladder": "Regular, 4-5 times/day, no nocturia",
+        "appetite": "Sluggish / variable (Mandagni / Vishamagni)",
+        "substances": "None. Non-smoker, non-alcoholic.",
+        "physicalActivity": "Sedentary due to bilateral knee stiffness."
+      },
+      "reviewOfSystems": {
+        "Musculoskeletal": "Bilateral knee joint pain, crepitus, morning stiffness (30-45 min). No small joint involvement.",
+        "Cardiovascular": "Controlled blood pressure (128/84 mmHg). No chest pain, palpitations, or orthopnea.",
+        "Respiratory": "No cough, breathlessness, or wheezing.",
+        "Gastrointestinal": "Post-meal bloating and constipation. No acid regurgitation or hematemesis.",
+        "Neurological": "No dizziness, focal weakness, or sensory deficits."
+      },
+      "previousInvestigations": [
+        {
+          "test": "Hemoglobin (CBC)",
+          "value": "10.2 g/dL",
+          "date": "2026-07-03",
+          "isAbnormal": true
+        },
+        {
+          "test": "ESR (1st Hour)",
+          "value": "34 mm/hr",
+          "date": "2026-07-03",
+          "isAbnormal": true
+        },
+        {
+          "test": "Fasting Blood Sugar",
+          "value": "98 mg/dL",
+          "date": "2026-07-03",
+          "isAbnormal": false
+        }
+      ],
+      "ayushAssessmentSummary": "Vata-Kapha Prakriti with Mandagni and Krura Koshtha. Signs consistent with Janu Sandhivata.",
+      "redFlagsDetected": [],
+      "missingInformation": [
+        "Recent X-Ray Bilateral Knees (Standing AP/Lateral) pending",
+        "Serum Uric Acid and Rheumatoid Factor (RF / Anti-CCP) recommended"
+      ],
+      "confidenceOverall": 0.95,
+      "provenanceSummary": [
+        {
+          "fact": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?: दोनों घुटने",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "मुख्य रूप से किन जोड़ों में दर्द या सूजन है?: दोनों घुटने",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "दर्द की तीव्रता 1 से 10 के पैमाने पर कितनी है?: 1-3: हल्का दर्द",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "क्या सुबह सोकर उठने पर जोड़ों में जकड़न (Stiffness) महसूस होती है?: कोई जकड़न नहीं",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "किन चीजों से आपका दर्द या जकड़न बढ़ जाती है?: ठंडा मौसम / ठंडी हवा",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "किस उपाय से आपको आराम मिलता है?: गर्म सिकाई या तेल की मालिश",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "क्या जोड़ों से कट-कट की आवाज आती है या सूजन दिखाई देती है?: केवल कट-कट की आवाज (संधि स्फुटन)",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "DIAGNOSIS: Essential Hypertension ",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.96
+        },
+        {
+          "fact": "MEDICATION: Yogaraj Guggulu 2 Tablets (500mg)",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.95
+        }
+      ],
+      "createdAt": "2026-08-29T16:12:29.448Z",
+      "physicianVerifiedAt": "2026-08-29T16:13:07.990Z",
+      "verifiedByDoctorId": "USR-DOC-01",
+      "doctorNotes": "History and joint stiffness verified in person with patient Radha Sharma."
+    },
+    {
+      "id": "SUM-HERO-01",
+      "sessionId": "SES-HERO-01",
+      "patientId": "PAT-HERO-01",
+      "version": 2,
+      "status": "PHYSICIAN_VERIFIED",
+      "patientSnapshot": "58-year-old female presenting with chronic bilateral knee pain (Sandhivata) for 6 months with morning stiffness, underlying controlled Hypertension on Amlodipine 5mg, and mild Agnimandya (digestive sluggishness).",
+      "chiefComplaint": "Bilateral knee joint pain, morning stiffness (30-45 mins), difficulty in climbing stairs for past 6 months.",
+      "historyOfPresentIllness": "Symptoms began insidiously 6 months ago as mild aching in the right knee, gradually involving both knees. Pain is aggravated by cold weather, prolonged walking, and descending stairs. Relieved partially by warm oil application and rest. Associated with audible crepitus and mild localized heaviness. No history of sudden lock, fever, or traumatic injury.",
+      "relevantPastHistory": [
+        "Known case of Essential Hypertension for 4 years (well-controlled on regular medication)",
+        "History of Janu Basti treatment at AIIA in Nov 2025 with good symptomatic relief",
+        "No past history of Diabetes Mellitus, Asthma, or Cardiac events"
+      ],
+      "surgicalHistory": [
+        "No major surgical interventions reported."
+      ],
+      "medicationHistory": [
+        {
+          "name": "Amlodipine",
+          "dose": "5 mg",
+          "freq": "OD Morning",
+          "source": "Patient Voice & OCR Prescription",
+          "confidence": 0.98
+        },
+        {
+          "name": "Yogaraj Guggulu",
+          "dose": "2 Tablets (500mg)",
+          "freq": "BD with warm water",
+          "source": "OCR Prescription 2026-06-15",
+          "confidence": 0.95
+        },
+        {
+          "name": "Shallaki (Boswellia)",
+          "dose": "500 mg",
+          "freq": "BD after meals",
+          "source": "OCR Prescription 2026-06-15",
+          "confidence": 0.93
+        },
+        {
+          "name": "Paracetamol",
+          "dose": "650 mg",
+          "freq": "SOS (as needed)",
+          "source": "Patient Voice",
+          "confidence": 0.9
+        }
+      ],
+      "allergies": [
+        {
+          "allergen": "Sulfa Drugs / Co-trimoxazole",
+          "severity": "MODERATE",
+          "reaction": "Skin rash and itching (self-reported 5 years ago)"
+        }
+      ],
+      "familyHistory": [
+        "Mother had history of chronic joint pains (Sandhigata Vata)",
+        "Father had history of Hypertension"
+      ],
+      "personalHistory": {
+        "diet": "Vegetarian, prefers warm cooked food, irregular meal timings (Vishamashana)",
+        "sleep": "Disturbed / light sleep due to knee discomfort when turning sides (approx 5-6 hrs/night)",
+        "bowel": "Irregular, hard stools, tendency towards constipation (Krura Koshtha)",
+        "bladder": "Regular, 4-5 times/day, no nocturia or dysuria",
+        "appetite": "Sluggish / variable (Mandagni / Vishamagni)",
+        "substances": "None. Does not consume tobacco or alcohol.",
+        "physicalActivity": "Sedentary. Minimal walking due to knee pain."
+      },
+      "reviewOfSystems": {
+        "Musculoskeletal": "Bilateral knee pain, crepitus, morning stiffness (30-45 mins). No small joint involvement in hands/feet.",
+        "Cardiovascular": "Controlled BP (128/84 mmHg). No chest pain, palpitations, or orthopnea.",
+        "Respiratory": "No cough, wheezing, or breathlessness on flat walking.",
+        "Gastrointestinal": "Post-meal fullness, bloating, constipation. No acidity or hematemesis.",
+        "Neurological": "No dizziness, numbness, tingling, or focal weakness."
+      },
+      "previousInvestigations": [
+        {
+          "test": "Hemoglobin (CBC)",
+          "value": "10.2 g/dL",
+          "date": "2026-07-03",
+          "isAbnormal": true
+        },
+        {
+          "test": "ESR (1st Hour)",
+          "value": "34 mm/hr",
+          "date": "2026-07-03",
+          "isAbnormal": true
+        },
+        {
+          "test": "Fasting Blood Sugar",
+          "value": "98 mg/dL",
+          "date": "2026-07-03",
+          "isAbnormal": false
+        }
+      ],
+      "ayushAssessmentSummary": "Doshic Imbalance: Vata-Kapha Prakopa with Dhatukshaya in Asthi-Majja Dhatu. Agni: Mandagni. Koshtha: Krura. Dushya: Asthi, Sandhi, Majja, Snayu. Nidana: Vatakara intake + aging factor (Vaya). Samprapti: Vata Sthanasamshraya in Janu Sandhi manifesting as Sandhivata (Osteoarthritis).",
+      "redFlagsDetected": [],
+      "missingInformation": [
+        "Recent X-Ray Bilateral Knees (Standing AP/Lateral) pending",
+        "Serum Uric Acid and Rheumatoid Factor (RF / Anti-CCP) to rule out inflammatory arthropathy"
+      ],
+      "confidenceOverall": 0.95,
+      "provenanceSummary": [
+        {
+          "fact": "Chief Complaint: Knee pain & stiffness for 6 months",
+          "source": "PATIENT_VOICE",
+          "confidence": 0.96
+        },
+        {
+          "fact": "Pain severity 6/10, worse on stairs & cold weather",
+          "source": "PATIENT_TOUCH",
+          "confidence": 1
+        },
+        {
+          "fact": "Amlodipine 5mg regular daily",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.98
+        },
+        {
+          "fact": "Sulfa allergy",
+          "source": "PATIENT_VOICE",
+          "confidence": 0.92
+        },
+        {
+          "fact": "Hb 10.2 g/dL (Mild Anaemia / Pandu)",
+          "source": "OCR_DOCUMENT",
+          "confidence": 0.97
+        },
+        {
+          "fact": "Vata-Kapha Prakriti & Mandagni synthesis",
+          "source": "AI_INFERENCE",
+          "confidence": 0.94
+        }
+      ],
+      "createdAt": "2026-08-28T08:25:30Z",
+      "physicianVerifiedAt": "2026-08-29T16:21:18.751Z",
+      "verifiedByDoctorId": "USR-DOC-01",
+      "doctorNotes": "History and joint stiffness verified in person with patient Radha Sharma."
+    }
+  ],
+  "redFlagAlerts": [
+    {
+      "id": "RFA-EMERG-01",
+      "sessionId": "SES-EMERG-02",
+      "patientId": "PAT-EMERG-02",
+      "tokenNumber": "EMERG-001",
+      "patientName": "Shri Rajesh Patel",
+      "age": 62,
+      "gender": "MALE",
+      "triggerRule": "RED_FLAG_ACUTE_CORONARY_SYNDROME",
+      "triggerInput": "Voice intake: \"Severe pressing chest pain for 45 minutes radiating to left shoulder and jaw with heavy sweating and breathlessness.\"",
+      "severity": "EMERGENCY_CRITICAL",
+      "detectedAt": "2026-08-28T08:48:15Z",
+      "status": "ACKNOWLEDGED",
+      "acknowledgedBy": "Sister Suniti Rao (Triage Nurse)",
+      "acknowledgedAt": "2026-08-29T16:39:41.710Z",
+      "clinicalActionTaken": "Immediate bedside ECG and oxygen support initiated. Dr. Sen notified."
+    }
+  ],
+  "consultations": [
+    {
+      "id": "CON-HERO-01",
+      "appointmentId": "APT-002",
+      "patientId": "PAT-EMERG-02",
+      "practitionerId": "PRAC-01",
+      "aiSummaryId": "SUM-HERO-01",
+      "clinicalExamination": {
+        "generalAppearance": "Conscious, oriented, ambulatory with mild antalgic gait",
+        "vitals": {
+          "bp": "126/82 mmHg",
+          "pulse": "76 bpm",
+          "temp": "98.4 F",
+          "spo2": "99%",
+          "respRate": "16 /min"
+        },
+        "systemicExam": "Knee joints: Crepitus on passive flexion, no active joint effusion, range of motion 0-110 degrees"
+      },
+      "assessment": "Janu Sandhivata (Bilateral Knee Osteoarthritis) with Mandagni & Dhatukshaya. Essential Hypertension (controlled).",
+      "finalDiagnosis": [
+        {
+          "code": "NAMASTE-AYU-042",
+          "name": "Janu Sandhivata (जानु संधिवात)",
+          "system": "NAMASTE_AYUSH"
+        },
+        {
+          "code": "M17.0",
+          "name": "Primary Bilateral Osteoarthritis of Knee",
+          "system": "ICD11"
+        },
+        {
+          "code": "BA00",
+          "name": "Essential Hypertension",
+          "system": "ICD11"
+        }
+      ],
+      "ayushChikitsaSutra": "Vatahara, Shoolahara, Agni-Deepana & Rasayana Chikitsa",
+      "followUpDate": "2026-09-28",
+      "dietLifestyleAdvice": [
+        "Avoid cold drinks, curd at night, and dry fast food (Vatakara Ahara)",
+        "Daily gentle warm oil massage with Mahanarayana Taila",
+        "Avoid cross-legged sitting and deep squatting on floor",
+        "Perform isometric quadriceps strengthening exercises under guidance"
+      ],
+      "status": "FINALIZED",
+      "startedAt": "2026-08-29T16:13:38.146Z",
+      "finalizedAt": "2026-08-29T16:37:42.301Z"
+    }
+  ],
+  "prescriptions": [
+    {
+      "id": "RX-XJWT58G",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Yogaraj Guggulu",
+      "type": "AYURVEDIC",
+      "form": "TABLET",
+      "dosage": "2 Tablets (500mg each)",
+      "frequency": "Twice Daily (Morning & Night)",
+      "durationDays": 30,
+      "anupana": "Lukewarm water",
+      "instructions": "Take after meals"
+    },
+    {
+      "id": "RX-MRCA0LU",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Shallaki (Boswellia serrata) 500mg",
+      "type": "AYURVEDIC",
+      "form": "CAPSULE",
+      "dosage": "1 Capsule",
+      "frequency": "Twice Daily",
+      "durationDays": 30,
+      "anupana": "Warm water",
+      "instructions": "Take after meals"
+    },
+    {
+      "id": "RX-KX5O2ZR",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Mahanarayana Taila",
+      "type": "AYURVEDIC",
+      "form": "TAILA",
+      "dosage": "15 ml",
+      "frequency": "Twice Daily local application",
+      "durationDays": 30,
+      "anupana": "N/A",
+      "instructions": "Apply warm oil gently over knee joints without heavy pressure, followed by hot fomentation (Svedana)"
+    },
+    {
+      "id": "RX-KKT8EA3",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Tab Amlodipine 5mg",
+      "type": "ALLOPATHIC",
+      "form": "TABLET",
+      "dosage": "1 Tablet",
+      "frequency": "Once Daily (Morning)",
+      "durationDays": 30,
+      "anupana": "Water",
+      "instructions": "Continue regular BP medication with daily morning monitoring"
+    },
+    {
+      "id": "RX-UG112QQ",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Yogaraj Guggulu",
+      "type": "AYURVEDIC",
+      "form": "TABLET",
+      "dosage": "2 Tablets (500mg each)",
+      "frequency": "Twice Daily (Morning & Night)",
+      "durationDays": 30,
+      "anupana": "Lukewarm water",
+      "instructions": "Take after meals"
+    },
+    {
+      "id": "RX-C70F91T",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Shallaki (Boswellia serrata) 500mg",
+      "type": "AYURVEDIC",
+      "form": "CAPSULE",
+      "dosage": "1 Capsule",
+      "frequency": "Twice Daily",
+      "durationDays": 30,
+      "anupana": "Warm water",
+      "instructions": "Take after meals"
+    },
+    {
+      "id": "RX-M80T111",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Mahanarayana Taila",
+      "type": "AYURVEDIC",
+      "form": "TAILA",
+      "dosage": "15 ml",
+      "frequency": "Twice Daily local application",
+      "durationDays": 30,
+      "anupana": "N/A",
+      "instructions": "Apply warm oil gently over knee joints without heavy pressure, followed by hot fomentation (Svedana)"
+    },
+    {
+      "id": "RX-T7GVRMO",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Tab Amlodipine 5mg",
+      "type": "ALLOPATHIC",
+      "form": "TABLET",
+      "dosage": "1 Tablet",
+      "frequency": "Once Daily (Morning)",
+      "durationDays": 30,
+      "anupana": "Water",
+      "instructions": "Continue regular BP medication with daily morning monitoring"
+    },
+    {
+      "id": "RX-L79S9JK",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Yogaraj Guggulu",
+      "type": "AYURVEDIC",
+      "form": "TABLET",
+      "dosage": "2 Tablets (500mg each)",
+      "frequency": "Twice Daily (Morning & Night)",
+      "durationDays": 30,
+      "anupana": "Lukewarm water",
+      "instructions": "Take after meals"
+    },
+    {
+      "id": "RX-7BDUVTB",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Shallaki (Boswellia serrata) 500mg",
+      "type": "AYURVEDIC",
+      "form": "CAPSULE",
+      "dosage": "1 Capsule",
+      "frequency": "Twice Daily",
+      "durationDays": 30,
+      "anupana": "Warm water",
+      "instructions": "Take after meals"
+    },
+    {
+      "id": "RX-ACUPSL4",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Mahanarayana Taila",
+      "type": "AYURVEDIC",
+      "form": "TAILA",
+      "dosage": "15 ml",
+      "frequency": "Twice Daily local application",
+      "durationDays": 30,
+      "anupana": "N/A",
+      "instructions": "Apply warm oil gently over knee joints without heavy pressure, followed by hot fomentation (Svedana)"
+    },
+    {
+      "id": "RX-DQ3FUST",
+      "consultationId": "CON-HERO-01",
+      "medicineName": "Tab Amlodipine 5mg",
+      "type": "ALLOPATHIC",
+      "form": "TABLET",
+      "dosage": "1 Tablet",
+      "frequency": "Once Daily (Morning)",
+      "durationDays": 30,
+      "anupana": "Water",
+      "instructions": "Continue regular BP medication with daily morning monitoring"
+    }
+  ],
+  "investigations": [],
+  "notifications": [
+    {
+      "id": "NOTIF-KLT7P31",
+      "timestamp": "2026-08-29T16:28:16.129Z",
+      "patientId": "PAT-HERO-01",
+      "channel": "SMS",
+      "title": "Appointment Confirmed",
+      "message": "Your appointment is confirmed. Token: A-026. Approx wait: 12 mins.",
+      "status": "DELIVERED"
+    },
+    {
+      "id": "NOTIF-JYNGSBX",
+      "timestamp": "2026-08-29T16:11:05.580Z",
+      "patientId": "PAT-HERO-01",
+      "channel": "SMS",
+      "title": "Appointment Confirmed",
+      "message": "Your appointment is confirmed. Token: A-025. Approx wait: 36 mins.",
+      "status": "DELIVERED"
+    },
+    {
+      "id": "NOTIF-001",
+      "patientId": "PAT-HERO-01",
+      "channel": "SMS",
+      "title": "Appointment Confirmed — AIIA MediKiosk",
+      "message": "Dear Radha Sharma, your appointment with Prof. (Dr.) Ananya Sharma (Kayachikitsa) is confirmed for 28-Aug-2026 at 09:15 AM. Token: A-027. Room: OPD 104.",
+      "timestamp": "2026-08-28T08:08:30Z",
+      "status": "DELIVERED"
+    },
+    {
+      "id": "NOTIF-002",
+      "patientId": "PAT-HERO-01",
+      "channel": "WHATSAPP",
+      "title": "Queue Update",
+      "message": "MediKiosk Live Queue: Token A-025 is currently with Dr. Ananya Sharma. Your Token is A-027. Approx waiting time: 18 mins. Please proceed to OPD Waiting Lounge.",
+      "timestamp": "2026-08-28T08:45:10Z",
+      "status": "DELIVERED"
+    }
+  ],
+  "integrationEvents": [
+    {
+      "id": "INT-4J7QPG0",
+      "timestamp": "2026-08-29T16:37:42.303Z",
+      "integrationType": "HIS_EMR",
+      "direction": "OUTBOUND",
+      "endpoint": "https://his-demo.aiia.gov.in/api/v2/opd/encounter-preintake",
+      "status": "SIMULATED_SUCCESS",
+      "latencyMs": 161,
+      "payload": {
+        "resourceType": "Encounter",
+        "id": "AIIA-HIS-ENC-911903",
+        "status": "in-progress",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "Ambulatory / OPD"
+        },
+        "subject": {
+          "reference": "Patient/PAT-EMERG-02"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "Practitioner/PRAC-01"
+            }
+          }
+        ],
+        "reasonCode": [
+          {
+            "text": "Janu Sandhivata (Bilateral Knee Osteoarthritis) with Mandagni & Dhatukshaya. Essential Hypertension (controlled)."
+          }
+        ],
+        "period": {
+          "start": "2026-08-29T16:37:42.302Z"
+        }
+      },
+      "response": {
+        "status": "RECEIVED",
+        "hisEncounterRef": "AIIA-HIS-ENC-911903",
+        "ackCode": "AA",
+        "message": "Pre-intake structured clinical history successfully linked to HIS EMR queue."
+      }
+    },
+    {
+      "id": "INT-TAHFQIV",
+      "timestamp": "2026-08-29T16:27:34.570Z",
+      "integrationType": "ABDM_M1",
+      "direction": "OUTBOUND",
+      "endpoint": "https://sandbox.abdm.gov.in/v1/registration/mobile/verifyOtp",
+      "status": "SIMULATED_SUCCESS",
+      "latencyMs": 120,
+      "payload": {
+        "abhaNumber": "91-4829-1029-4821",
+        "authMode": "DEMO_SIMULATION",
+        "timestamp": "2026-08-29T16:27:34.570Z"
+      },
+      "response": {
+        "status": "SUCCESS",
+        "verified": true,
+        "kycStatus": "VERIFIED",
+        "abhaAddress": "radha.sharma@abdm"
+      }
+    },
+    {
+      "id": "INT-HK4SLP7",
+      "timestamp": "2026-08-29T16:15:26.438Z",
+      "integrationType": "ABDM_M1",
+      "direction": "OUTBOUND",
+      "endpoint": "https://sandbox.abdm.gov.in/v1/registration/mobile/verifyOtp",
+      "status": "SIMULATED_SUCCESS",
+      "latencyMs": 120,
+      "payload": {
+        "abhaNumber": "91-4829-1029-4821",
+        "authMode": "DEMO_SIMULATION",
+        "timestamp": "2026-08-29T16:15:26.438Z"
+      },
+      "response": {
+        "status": "SUCCESS",
+        "verified": true,
+        "kycStatus": "VERIFIED",
+        "abhaAddress": "radha.sharma@abdm"
+      }
+    },
+    {
+      "id": "INT-491OQBU",
+      "timestamp": "2026-08-29T16:13:53.596Z",
+      "integrationType": "HIS_EMR",
+      "direction": "OUTBOUND",
+      "endpoint": "https://his-demo.aiia.gov.in/api/v2/opd/encounter-preintake",
+      "status": "SIMULATED_SUCCESS",
+      "latencyMs": 160,
+      "payload": {
+        "resourceType": "Encounter",
+        "id": "AIIA-HIS-ENC-796454",
+        "status": "in-progress",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "Ambulatory / OPD"
+        },
+        "subject": {
+          "reference": "Patient/PAT-EMERG-02"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "Practitioner/PRAC-01"
+            }
+          }
+        ],
+        "reasonCode": [
+          {
+            "text": "Janu Sandhivata (Bilateral Knee Osteoarthritis) with Mandagni & Dhatukshaya. Essential Hypertension (controlled)."
+          }
+        ],
+        "period": {
+          "start": "2026-08-29T16:13:53.596Z"
+        }
+      },
+      "response": {
+        "status": "RECEIVED",
+        "hisEncounterRef": "AIIA-HIS-ENC-796454",
+        "ackCode": "AA",
+        "message": "Pre-intake structured clinical history successfully linked to HIS EMR queue."
+      }
+    },
+    {
+      "id": "INT-45VSTFH",
+      "timestamp": "2026-08-29T16:13:38.146Z",
+      "integrationType": "HIS_EMR",
+      "direction": "OUTBOUND",
+      "endpoint": "https://his-demo.aiia.gov.in/api/v2/opd/encounter-preintake",
+      "status": "SIMULATED_SUCCESS",
+      "latencyMs": 160,
+      "payload": {
+        "resourceType": "Encounter",
+        "id": "AIIA-HIS-ENC-251222",
+        "status": "in-progress",
+        "class": {
+          "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+          "code": "AMB",
+          "display": "Ambulatory / OPD"
+        },
+        "subject": {
+          "reference": "Patient/PAT-EMERG-02"
+        },
+        "participant": [
+          {
+            "individual": {
+              "reference": "Practitioner/PRAC-01"
+            }
+          }
+        ],
+        "reasonCode": [
+          {
+            "text": "Janu Sandhivata (Bilateral Knee Osteoarthritis) with Mandagni & Dhatukshaya. Essential Hypertension (controlled)."
+          }
+        ],
+        "period": {
+          "start": "2026-08-29T16:13:38.146Z"
+        }
+      },
+      "response": {
+        "status": "RECEIVED",
+        "hisEncounterRef": "AIIA-HIS-ENC-251222",
+        "ackCode": "AA",
+        "message": "Pre-intake structured clinical history successfully linked to HIS EMR queue."
+      }
+    },
+    {
+      "id": "INT-23E302K",
+      "timestamp": "2026-08-29T16:10:46.817Z",
+      "integrationType": "ABDM_M1",
+      "direction": "OUTBOUND",
+      "endpoint": "https://sandbox.abdm.gov.in/v1/registration/mobile/verifyOtp",
+      "status": "SIMULATED_SUCCESS",
+      "latencyMs": 120,
+      "payload": {
+        "abhaNumber": "91-4829-1029-4821",
+        "authMode": "DEMO_SIMULATION",
+        "timestamp": "2026-08-29T16:10:46.817Z"
+      },
+      "response": {
+        "status": "SUCCESS",
+        "verified": true,
+        "kycStatus": "VERIFIED",
+        "abhaAddress": "radha.sharma@abdm"
+      }
+    },
+    {
+      "id": "INT-001",
+      "integrationType": "ABDM_M1",
+      "direction": "OUTBOUND",
+      "endpoint": "https://sandbox.abdm.gov.in/v1/registration/mobile/verifyOtp",
+      "status": "SIMULATED_SUCCESS",
+      "latencyMs": 140,
+      "payload": {
+        "abhaNumber": "91-4829-1029-4821",
+        "authMode": "DEMO_SIMULATION"
+      },
+      "response": {
+        "status": "SUCCESS",
+        "verified": true,
+        "kycStatus": "VERIFIED",
+        "abhaAddress": "radha.sharma@abdm"
+      },
+      "timestamp": "2026-08-28T08:04:30Z"
+    },
+    {
+      "id": "INT-002",
+      "integrationType": "HIS_EMR",
+      "direction": "OUTBOUND",
+      "endpoint": "https://his-demo.aiia.gov.in/api/v2/opd/encounter-preintake",
+      "status": "SIMULATED_SUCCESS",
+      "latencyMs": 180,
+      "payload": {
+        "encounterId": "ENC-2026-0828-027",
+        "patientId": "MK-PAT-2026-000124",
+        "intakeStatus": "COMPLETED_BY_AI"
+      },
+      "response": {
+        "status": "RECEIVED",
+        "hisEncounterRef": "AIIA-HIS-ENC-882194"
+      },
+      "timestamp": "2026-08-28T08:26:00Z"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "AUD-51ACRSR",
+      "timestamp": "2026-08-29T16:37:42.306Z",
+      "correlationId": "CON-FINAL",
+      "actorId": "PRAC-01",
+      "actorRole": "DOCTOR",
+      "action": "CONSULTATION_FINALIZED",
+      "resourceType": "CONSULTATION",
+      "resourceId": "CON-HERO-01",
+      "details": {
+        "diagnosis": [
+          {
+            "code": "NAMASTE-AYU-042",
+            "name": "Janu Sandhivata (जानु संधिवात)",
+            "system": "NAMASTE_AYUSH"
+          },
+          {
+            "code": "M17.0",
+            "name": "Primary Bilateral Osteoarthritis of Knee",
+            "system": "ICD11"
+          },
+          {
+            "code": "BA00",
+            "name": "Essential Hypertension",
+            "system": "ICD11"
+          }
+        ],
+        "prescriptionsCount": 4
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-SR2C1V0",
+      "timestamp": "2026-08-29T16:37:13.059Z",
+      "correlationId": "SUM-VERIFY",
+      "actorId": "USR-DOC-01",
+      "actorRole": "DOCTOR",
+      "action": "PHYSICIAN_VERIFIED_AI_SUMMARY",
+      "resourceType": "AI_SUMMARY",
+      "resourceId": "SUM-3LFKNLZ",
+      "details": {
+        "version": 2,
+        "notes": "History and joint stiffness verified in person with patient Radha Sharma."
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-IES3IIP",
+      "timestamp": "2026-08-29T16:35:40.011Z",
+      "correlationId": "CORR-SUM-SUM-3LFKNLZ",
+      "actorId": "CLINICAL_SUMMARY_ENGINE",
+      "actorRole": "SYSTEM_ADMIN",
+      "action": "AI_STRUCTURED_SUMMARY_GENERATED",
+      "resourceType": "AI_SUMMARY",
+      "resourceId": "SUM-3LFKNLZ",
+      "details": {
+        "version": 1,
+        "status": "DRAFT_AI",
+        "confidence": 0.95
+      },
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "AUD-2BNGPT5",
+      "timestamp": "2026-08-29T16:34:53.327Z",
+      "correlationId": "OCR-PROC",
+      "actorId": "AI_OCR_ENGINE",
+      "actorRole": "SYSTEM_ADMIN",
+      "action": "DOCUMENT_OCR_PROCESSED",
+      "resourceType": "DOCUMENT",
+      "resourceId": "DOC-001",
+      "details": {
+        "entitiesCount": 2,
+        "confidence": 0.96
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-LLW0QP4",
+      "timestamp": "2026-08-29T16:28:16.126Z",
+      "correlationId": "APT-BOOK",
+      "actorId": "PAT-HERO-01",
+      "actorRole": "PATIENT",
+      "action": "APPOINTMENT_BOOKED",
+      "resourceType": "APPOINTMENT",
+      "resourceId": "APT-6OZY65C",
+      "details": {
+        "appointmentNumber": "APT-2026-0828-031",
+        "tokenNumber": "A-026"
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-H7Q5DIA",
+      "timestamp": "2026-08-29T16:27:55.817Z",
+      "correlationId": "CONSENT-GRANT",
+      "actorId": "PAT-HERO-01",
+      "actorRole": "PATIENT",
+      "action": "DPDP_CONSENT_GRANTED",
+      "resourceType": "CONSENT",
+      "resourceId": "CNS-6KI9HWX",
+      "details": {
+        "personalInfo": true,
+        "clinicalHistory": true,
+        "voiceRecording": true,
+        "ocrDocuments": true,
+        "aiSummary": true,
+        "abdmDataExchange": true
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-1ZQ2RPZ",
+      "timestamp": "2026-08-29T16:21:56.106Z",
+      "correlationId": "CORR-SUM-SUM-1N52VOZ",
+      "actorId": "CLINICAL_SUMMARY_ENGINE",
+      "actorRole": "SYSTEM_ADMIN",
+      "action": "AI_STRUCTURED_SUMMARY_GENERATED",
+      "resourceType": "AI_SUMMARY",
+      "resourceId": "SUM-1N52VOZ",
+      "details": {
+        "version": 1,
+        "status": "DRAFT_AI",
+        "confidence": 0.95
+      },
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "AUD-MN59RCC",
+      "timestamp": "2026-08-29T16:21:18.754Z",
+      "correlationId": "SUM-VERIFY",
+      "actorId": "USR-DOC-01",
+      "actorRole": "DOCTOR",
+      "action": "PHYSICIAN_VERIFIED_AI_SUMMARY",
+      "resourceType": "AI_SUMMARY",
+      "resourceId": "SUM-HERO-01",
+      "details": {
+        "version": 2,
+        "notes": "History and joint stiffness verified in person with patient Radha Sharma."
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-IHRBC97",
+      "timestamp": "2026-08-29T16:19:25.510Z",
+      "correlationId": "CORR-SUM-SUM-1X8SV1C",
+      "actorId": "CLINICAL_SUMMARY_ENGINE",
+      "actorRole": "SYSTEM_ADMIN",
+      "action": "AI_STRUCTURED_SUMMARY_GENERATED",
+      "resourceType": "AI_SUMMARY",
+      "resourceId": "SUM-1X8SV1C",
+      "details": {
+        "version": 1,
+        "status": "DRAFT_AI",
+        "confidence": 0.95
+      },
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "AUD-EG8BAMJ",
+      "timestamp": "2026-08-29T16:15:33.360Z",
+      "correlationId": "CONSENT-GRANT",
+      "actorId": "PAT-HERO-01",
+      "actorRole": "PATIENT",
+      "action": "DPDP_CONSENT_GRANTED",
+      "resourceType": "CONSENT",
+      "resourceId": "CNS-BFO9P4K",
+      "details": {
+        "personalInfo": true,
+        "clinicalHistory": true,
+        "voiceRecording": true,
+        "ocrDocuments": true,
+        "aiSummary": true,
+        "abdmDataExchange": true
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-LFQVC0P",
+      "timestamp": "2026-08-29T16:13:53.598Z",
+      "correlationId": "CON-FINAL",
+      "actorId": "PRAC-01",
+      "actorRole": "DOCTOR",
+      "action": "CONSULTATION_FINALIZED",
+      "resourceType": "CONSULTATION",
+      "resourceId": "CON-HERO-01",
+      "details": {
+        "diagnosis": [
+          {
+            "code": "NAMASTE-AYU-042",
+            "name": "Janu Sandhivata (जानु संधिवात)",
+            "system": "NAMASTE_AYUSH"
+          },
+          {
+            "code": "M17.0",
+            "name": "Primary Bilateral Osteoarthritis of Knee",
+            "system": "ICD11"
+          },
+          {
+            "code": "BA00",
+            "name": "Essential Hypertension",
+            "system": "ICD11"
+          }
+        ],
+        "prescriptionsCount": 4
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-5062RVI",
+      "timestamp": "2026-08-29T16:13:38.150Z",
+      "correlationId": "CON-FINAL",
+      "actorId": "PRAC-01",
+      "actorRole": "DOCTOR",
+      "action": "CONSULTATION_FINALIZED",
+      "resourceType": "CONSULTATION",
+      "resourceId": "CON-HERO-01",
+      "details": {
+        "diagnosis": [
+          {
+            "code": "NAMASTE-AYU-042",
+            "name": "Janu Sandhivata (जानु संधिवात)",
+            "system": "NAMASTE_AYUSH"
+          },
+          {
+            "code": "M17.0",
+            "name": "Primary Bilateral Osteoarthritis of Knee",
+            "system": "ICD11"
+          },
+          {
+            "code": "BA00",
+            "name": "Essential Hypertension",
+            "system": "ICD11"
+          }
+        ],
+        "prescriptionsCount": 4
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-MDD3B2N",
+      "timestamp": "2026-08-29T16:13:07.992Z",
+      "correlationId": "SUM-VERIFY",
+      "actorId": "USR-DOC-01",
+      "actorRole": "DOCTOR",
+      "action": "PHYSICIAN_VERIFIED_AI_SUMMARY",
+      "resourceType": "AI_SUMMARY",
+      "resourceId": "SUM-1NHIABG",
+      "details": {
+        "version": 2,
+        "notes": "History and joint stiffness verified in person with patient Radha Sharma."
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-YY7I4WX",
+      "timestamp": "2026-08-29T16:12:29.450Z",
+      "correlationId": "CORR-SUM-SUM-1NHIABG",
+      "actorId": "CLINICAL_SUMMARY_ENGINE",
+      "actorRole": "SYSTEM_ADMIN",
+      "action": "AI_STRUCTURED_SUMMARY_GENERATED",
+      "resourceType": "AI_SUMMARY",
+      "resourceId": "SUM-1NHIABG",
+      "details": {
+        "version": 1,
+        "status": "DRAFT_AI",
+        "confidence": 0.95
+      },
+      "ipAddress": "127.0.0.1"
+    },
+    {
+      "id": "AUD-2B8EYX4",
+      "timestamp": "2026-08-29T16:12:27.451Z",
+      "correlationId": "OCR-PROC",
+      "actorId": "AI_OCR_ENGINE",
+      "actorRole": "SYSTEM_ADMIN",
+      "action": "DOCUMENT_OCR_PROCESSED",
+      "resourceType": "DOCUMENT",
+      "resourceId": "DOC-001",
+      "details": {
+        "entitiesCount": 2,
+        "confidence": 0.96
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-EF9JI6R",
+      "timestamp": "2026-08-29T16:11:05.579Z",
+      "correlationId": "APT-BOOK",
+      "actorId": "PAT-HERO-01",
+      "actorRole": "PATIENT",
+      "action": "APPOINTMENT_BOOKED",
+      "resourceType": "APPOINTMENT",
+      "resourceId": "APT-H7WNV20",
+      "details": {
+        "appointmentNumber": "APT-2026-0828-030",
+        "tokenNumber": "A-025"
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-OU63779",
+      "timestamp": "2026-08-29T16:10:53.913Z",
+      "correlationId": "CONSENT-GRANT",
+      "actorId": "PAT-HERO-01",
+      "actorRole": "PATIENT",
+      "action": "DPDP_CONSENT_GRANTED",
+      "resourceType": "CONSENT",
+      "resourceId": "CNS-EQN3RKM",
+      "details": {
+        "personalInfo": true,
+        "clinicalHistory": true,
+        "voiceRecording": false,
+        "ocrDocuments": false,
+        "aiSummary": false,
+        "abdmDataExchange": false
+      },
+      "ipAddress": "::1"
+    },
+    {
+      "id": "AUD-001",
+      "correlationId": "CORR-INIT-01",
+      "actorId": "PAT-HERO-01",
+      "actorRole": "PATIENT",
+      "action": "CONSENT_GRANTED",
+      "resourceType": "CONSENT",
+      "resourceId": "CNS-001",
+      "details": {
+        "version": "v2.4-DPDP-2026",
+        "scopes": [
+          "PERSONAL_INFO",
+          "VOICE",
+          "OCR",
+          "ABDM_SHARING"
+        ]
+      },
+      "ipAddress": "192.168.1.104",
+      "timestamp": "2026-08-28T08:05:12Z"
+    },
+    {
+      "id": "AUD-002",
+      "correlationId": "CORR-OCR-01",
+      "actorId": "AI_OCR_ENGINE",
+      "actorRole": "SYSTEM_ADMIN",
+      "action": "OCR_EXTRACTION_COMPLETED",
+      "resourceType": "DOCUMENT",
+      "resourceId": "DOC-002",
+      "details": {
+        "fileName": "City_PathLab_CBC_Report_2026-07-03.pdf",
+        "confidence": 0.97,
+        "extractedEntitiesCount": 5
+      },
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-08-28T08:19:05Z"
+    },
+    {
+      "id": "AUD-003",
+      "correlationId": "CORR-SUM-01",
+      "actorId": "CLINICAL_AI_SERVICE",
+      "actorRole": "SYSTEM_ADMIN",
+      "action": "AI_SUMMARY_GENERATED",
+      "resourceType": "AI_SUMMARY",
+      "resourceId": "SUM-HERO-01",
+      "details": {
+        "status": "DRAFT_AI",
+        "confidence": 0.95,
+        "redFlagsCount": 0
+      },
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-08-28T08:25:35Z"
+    }
+  ],
+  "systemHealth": [
+    {
+      "service": "Relational Database Store (SQLite/State)",
+      "status": "OPERATIONAL",
+      "latencyMs": 4,
+      "lastCheck": "2026-08-28T08:50:00Z",
+      "notes": "State persistent with ACID file flush. Zero query bottlenecks."
+    },
+    {
+      "service": "MediKiosk Clinical AI Engine (Ollama/LLM Gateway)",
+      "status": "DEMO_MODE",
+      "latencyMs": 180,
+      "lastCheck": "2026-08-28T08:50:00Z",
+      "notes": "Deterministic clinical ontology with LLM fallback adapter."
+    },
+    {
+      "service": "Document OCR & Medical Entity Extraction Pipeline",
+      "status": "OPERATIONAL",
+      "latencyMs": 950,
+      "lastCheck": "2026-08-28T08:50:00Z",
+      "notes": "Preprocessing, regex, and clinical NER pipeline operational."
+    },
+    {
+      "service": "Web Speech & Multimodal ASR Engine",
+      "status": "OPERATIONAL",
+      "latencyMs": 85,
+      "lastCheck": "2026-08-28T08:50:00Z",
+      "notes": "Native browser Web Speech API with simulated voice fallback."
+    },
+    {
+      "service": "ABDM Health Information Exchange (M1, M2, M3 Adapter)",
+      "status": "DEMO_MODE",
+      "latencyMs": 140,
+      "lastCheck": "2026-08-28T08:50:00Z",
+      "notes": "Simulated ABDM sandbox with FHIR R4 resource generation."
+    },
+    {
+      "service": "HIS / EMR Integration Gateway",
+      "status": "DEMO_MODE",
+      "latencyMs": 160,
+      "lastCheck": "2026-08-28T08:50:00Z",
+      "notes": "HL7/FHIR encounter transmission gateway active."
+    },
+    {
+      "service": "Hospital Notification Center (SMS / WhatsApp Gateway)",
+      "status": "DEMO_MODE",
+      "latencyMs": 45,
+      "lastCheck": "2026-08-28T08:50:00Z",
+      "notes": "Simulated multi-channel notification dispatcher active."
+    }
+  ]
+}

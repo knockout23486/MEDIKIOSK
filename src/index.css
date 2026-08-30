@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* High Contrast Mode for low vision / accessibility */
+html.high-contrast {
+  filter: contrast(125%);
+}
+
+html.high-contrast body {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+}
+
+html.high-contrast .bg-white,
+html.high-contrast .bg-slate-50,
+html.high-contrast .bg-slate-100 {
+  background-color: #121212 !important;
+  color: #ffffff !important;
+  border-color: #f59e0b !important;
+}
+
+/* Large Font Accessibility */
+html.large-font {
+  font-size: 115%;
+}
+
+@keyframes pulseSlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
