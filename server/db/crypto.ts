@@ -33,16 +33,23 @@ const TAG_BYTES = 16;
 
 function loadKey(): Buffer {
   const hex = process.env.APP_ENCRYPTION_KEY;
+
   if (hex && /^[0-9a-fA-F]{64}$/.test(hex)) {
+    // Valid 256-bit key supplied via environment variable. The key itself is
+    // never logged, never persisted, and never returned by any API.
     return Buffer.from(hex, 'hex');
   }
-  // Dev fallback so the platform boots without configuration. NOT for
-  // production — set APP_ENCRYPTION_KEY (openssl rand -hex 32).
-  if (hex) {
-    console.warn('[Crypto] APP_ENCRYPTION_KEY is not 64 hex chars — falling back to derived dev key.');
-  } else {
-    console.warn('[Crypto] APP_ENCRYPTION_KEY not set — using derived development key. Do NOT use in production.');
+
+  // SEC-008: in production a missing/malformed key is a fatal boot error —
+  // PHI must never be encrypted (or left unencryptable) under a weak default.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'FATAL: APP_ENCRYPTION_KEY must be set to 64 hex chars (openssl rand -hex 32) in production. Refusing to start.'
+    );
   }
+
+  // Development-only deterministic fallback so local boots work unconfigured.
+  console.warn('[Crypto] APP_ENCRYPTION_KEY not set/invalid — using derived DEVELOPMENT key. Never use in production.');
   return scryptSync('medikiosk-dev-only-phi-key', 'medikiosk-salt-v1', 32);
 }
 

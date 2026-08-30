@@ -44,10 +44,22 @@ async function call(base: string, method: string, path: string, token?: string, 
   return { status: res.status, body: parsed };
 }
 
-async function login(base: string, roleOrUsername: string, password?: string): Promise<string> {
+interface DemoAccount { username: string; password: string; role: string; }
+
+// Documented demo credentials (seedUsers.ts) — the API bcrypt-verifies each.
+const ACCOUNTS: Record<string, DemoAccount> = {
+  PATIENT: { username: 'patient', password: 'demo123', role: 'PATIENT' },
+  DOCTOR: { username: 'doctor', password: 'doctor123', role: 'DOCTOR' },
+  TRIAGE: { username: 'triage', password: 'triage123', role: 'TRIAGE' },
+  ADMIN: { username: 'admin', password: 'admin123', role: 'ADMIN' },
+  SYSTEM_ADMIN: { username: 'sysadmin', password: 'sysadmin123', role: 'SYSTEM_ADMIN' }
+};
+
+async function login(base: string, role: keyof typeof ACCOUNTS): Promise<string> {
+  const acct = ACCOUNTS[role];
   const res = await call(base, 'POST', '/api/auth/login', undefined,
-    password ? { username: roleOrUsername, password } : { role: roleOrUsername });
-  if (!res.body?.token) throw new Error(`login as ${roleOrUsername} failed: ${JSON.stringify(res.body)}`);
+    { username: acct.username, password: acct.password });
+  if (!res.body?.token) throw new Error(`login as ${role} failed: ${JSON.stringify(res.body)}`);
   return res.body.token as string;
 }
 
@@ -66,26 +78,56 @@ async function main() {
   const { port } = server.address() as { port: number };
   const base = `http://127.0.0.1:${port}`;
 
-  // --- 0. Login behavior -------------------------------------------------
-  console.log('0. Login & token issuance:');
+  // --- 0. Login behavior (SEC-006/SEC-007) ----------------------------------
+  console.log('0. Login & token issuance (strict credential verification):');
   const patientToken = await login(base, 'PATIENT');
   const doctorToken = await login(base, 'DOCTOR');
   const triageToken = await login(base, 'TRIAGE');
   const adminToken = await login(base, 'ADMIN');
   assert([patientToken, doctorToken, triageToken, adminToken].every(t => t.split('.').length === 3),
-    'Role-based demo login issues HS256 JWTs for every role');
+    'Credential login issues HS256 JWTs for every demo role');
 
   const pwOk = await call(base, 'POST', '/api/auth/login', undefined, { username: 'doctor', password: 'doctor123' });
   assert(pwOk.status === 200 && pwOk.body.token, 'Username+password login succeeds with correct credentials');
   assert(pwOk.body.user?.passwordHash === undefined, 'Login response never leaks passwordHash');
 
-  const pwBad = await call(base, 'POST', '/api/auth/login', undefined, { username: 'doctor', password: 'wrong' });
-  assert(pwBad.status === 401, 'Username+password login rejects wrong password (401)');
+  // SEC-006: every passwordless variant must fail — no demo bypass exists.
+  const roleOnly = await call(base, 'POST', '/api/auth/login', undefined, { role: 'ADMIN' });
+  assert(roleOnly.status === 401, 'Passwordless role-only login is REJECTED (401) — no demo bypass');
+  const missingPw = await call(base, 'POST', '/api/auth/login', undefined, { username: 'doctor' });
+  assert(missingPw.status === 401, 'Login with username but no password is rejected (401)');
+  const emptyPw = await call(base, 'POST', '/api/auth/login', undefined, { username: 'doctor', password: '' });
+  assert(emptyPw.status === 401, 'Login with empty password is rejected (401)');
+  const noBody = await call(base, 'POST', '/api/auth/login', undefined, {});
+  assert(noBody.status === 401, 'Login with no credentials is rejected (401)');
+
+  // SEC-006 regression: wrong password must fail for EVERY demo account.
+  let wrongPwFails = 0;
+  for (const acct of Object.values(ACCOUNTS)) {
+    const res = await call(base, 'POST', '/api/auth/login', undefined, { username: acct.username, password: 'wrong-password' });
+    if (res.status === 401) wrongPwFails++;
+    else console.error(`    ✗ wrong password for ${acct.username} returned ${res.status}`);
+  }
+  assert(wrongPwFails === Object.keys(ACCOUNTS).length,
+    `Wrong password fails (401) for all ${Object.keys(ACCOUNTS).length} demo accounts`);
+
   const pwUnknown = await call(base, 'POST', '/api/auth/login', undefined, { username: 'ghost', password: 'x' });
-  assert(pwUnknown.status === 401, 'Username+password login rejects unknown user (401)');
+  assert(pwUnknown.status === 401, 'Login rejects unknown user (401)');
+
+  // SEC-007: the database stores ONLY bcrypt hashes — zero plaintext.
+  const hashRows = (await db.pool.query('SELECT username, password_hash FROM users')).rows;
+  const BCRYPT_RE = /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/;
+  assert(hashRows.every((r: any) => BCRYPT_RE.test(r.password_hash)),
+    `users.password_hash is a bcrypt hash for all ${hashRows.length} rows`);
+  assert(!hashRows.some((r: any) => Object.values(ACCOUNTS).some(a => a.username === r.username && a.password === r.password_hash)),
+    'No plaintext demo password exists anywhere in the users table');
 
   const me = await call(base, 'GET', '/api/auth/me', doctorToken);
   assert(me.status === 200 && me.body.user?.role === 'DOCTOR', 'GET /api/auth/me returns the authenticated session');
+
+  const demoStateHashes = await call(base, 'GET', '/api/demo/state', adminToken);
+  assert(demoStateHashes.status === 200 && demoStateHashes.body?.users?.every?.((u: any) => u.passwordHash === undefined),
+    'GET /api/demo/state exposes no password hashes');
 
   // --- 1. 401 sweep — every protected endpoint, no/bad token ---------------
   console.log('\n1. Unauthenticated access is rejected (401) on every protected endpoint:');

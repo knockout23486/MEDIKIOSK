@@ -63,14 +63,14 @@ async function main() {
   const loginRes = await fetch(`${base}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ role: 'PATIENT' })
+    body: JSON.stringify({ username: 'patient', password: 'demo123' })
   }).then(r => r.json());
   if (!loginRes?.token) throw new Error('Login failed — cannot run concurrency test.');
   const authHeaders = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${loginRes.token}`
   };
-  console.log('  Authenticated as PATIENT (JWT issued, 12h expiry)');
+  console.log('  Authenticated as PATIENT via bcrypt-verified credentials (JWT issued)');
 
   // --- 1. Simultaneous patient registrations -------------------------------
   console.log(`\n  Firing ${N_REGISTRATIONS} simultaneous POST /api/patients ...`);

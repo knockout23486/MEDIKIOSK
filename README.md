@@ -79,15 +79,27 @@ serving stale state.
   application. Verify: `npm test` asserts raw SQL sees only `enc.v1.*` blobs.
 * **SEC-005 (fixed)** — the `AyushPariksha.tsx` TypeScript error is resolved;
   `npm run build` and `tsc --noEmit` are clean for client and server.
-* Still open for future audits (SEC-002 area): demo role-login issues tokens
-  without a password (kiosk UX parity) — seed users still carry plaintext
-  password fields awaiting migration to salted hashes; TLS termination and
-  ABDM production credentials are deployment concerns.
+* **SEC-006 (fixed)** — the passwordless demo-role login path is eradicated.
+  `POST /api/auth/login` strictly requires username + password for EVERY
+  account and verifies it against the stored bcrypt hash (a dummy comparison
+  runs for unknown usernames so timing cannot enumerate accounts). Missing,
+  empty, or wrong passwords all return 401 + an audit entry.
+* **SEC-007 (fixed)** — passwords are hashed with bcrypt (cost 10) in
+  `buildSeededUsers()` before insertion; the users table contains only
+  `$2b$…` hashes (zero plaintext, verified by SQL in the test suites). Demo
+  credentials remain documented for the showcase, but they are verified
+  server-side like any real credential.
+* **SEC-008 (fixed)** — key management hardened and tested: the AES key is a
+  64-hex-char secret loaded from `APP_ENCRYPTION_KEY` (never logged, never
+  persisted); `NODE_ENV=production` refuses to boot without it (fatal error,
+  same for `AUTH_JWT_SECRET`). GCM auth-tag validation is regression-tested:
+  every tampered ciphertext/tag fails decryption. Envelopes are versioned
+  (`enc.v1.`) to allow future key rotation.
 
 ## Test suites (all require PostgreSQL)
 
 | Script | Covers |
 | --- | --- |
-| `npm test` | 34 functional assertions: engines, transactions, PHI encryption-at-rest |
+| `npm test` | 39 functional assertions: engines, transactions, PHI encryption, GCM tamper detection, production key-guard |
 | `npm run test:concurrency` | 80 simultaneous HTTP registrations/bookings — no locks/duplicates/corruption |
 | `npm run test:auth` | SEC-003 regression: 401 sweep, forged/expired tokens, 403 RBAC matrix, IDOR |

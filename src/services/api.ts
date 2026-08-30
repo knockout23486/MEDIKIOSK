@@ -39,13 +39,9 @@ const jsonPost = (url: string, body: unknown) =>
   }).then(r => r.json());
 
 export const api = {
-  // Auth — stores the JWT for all subsequent calls.
-  login: (role: string): Promise<{ success?: boolean; user?: any; token?: string }> =>
-    jsonPost('/api/auth/login', { role }).then((res: any) => {
-      if (res?.token) setAuthToken(res.token);
-      return res;
-    }),
-  loginWithPassword: (username: string, password: string): Promise<{ success?: boolean; user?: any; token?: string }> =>
+  // Auth — credential login ONLY (SEC-006): the API verifies the bcrypt hash
+  // for every account; there is no passwordless role login anymore.
+  login: (username: string, password: string): Promise<{ success?: boolean; user?: any; token?: string }> =>
     jsonPost('/api/auth/login', { username, password }).then((res: any) => {
       if (res?.token) setAuthToken(res.token);
       return res;

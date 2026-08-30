@@ -4,7 +4,7 @@
 // the relational schema inside a single transaction (see store.resetDemoState).
 // ============================================================================
 import { db, DatabaseState } from './store.js';
-import { seededUsers, seededHospitals, seededDepartments, seededPractitioners } from './seedUsers.js';
+import { buildSeededUsers, seededHospitals, seededDepartments, seededPractitioners } from './seedUsers.js';
 import {
   seededPatients, seededConsents, seededAppointments, seededQueueTokens,
   seededClinicalSessions, seededClinicalAnswers, seededAyushAssessments
@@ -18,7 +18,7 @@ import {
 
 export function getInitialSeedData(): DatabaseState {
   return {
-    users: seededUsers,
+    users: buildSeededUsers(),
     patients: seededPatients,
     consents: seededConsents,
     hospitals: seededHospitals,

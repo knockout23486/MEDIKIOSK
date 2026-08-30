@@ -2,6 +2,18 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types/index.js';
 import { api, setAuthToken, getAuthToken } from '../services/api.js';
 
+// Documented demo credentials for this SIH showcase platform (SEC-006 note:
+// the API strictly verifies each password against its bcrypt hash — removing
+// this map only removes the demo convenience, not security. Production
+// deployments provision real per-user accounts instead).
+const DEMO_CREDENTIALS: Record<UserRole, { username: string; password: string }> = {
+  PATIENT: { username: 'patient', password: 'demo123' },
+  DOCTOR: { username: 'doctor', password: 'doctor123' },
+  TRIAGE: { username: 'triage', password: 'triage123' },
+  ADMIN: { username: 'admin', password: 'admin123' },
+  SYSTEM_ADMIN: { username: 'sysadmin', password: 'sysadmin123' }
+};
+
 interface AuthContextType {
   user: User;
   role: UserRole;
@@ -72,7 +84,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!getAuthToken());
 
   /**
-   * Authenticates against the API and caches the issued JWT (SEC-003): every
+   * Authenticates against the API with the demo account credentials for the
+   * selected role and caches the issued JWT (SEC-003/SEC-006): every
    * subsequent api.* call carries `Authorization: Bearer <token>`. Falls back
    * to the local demo profile when the API is unreachable (offline demo mode).
    */
@@ -80,7 +93,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRoleState(newRole);
     setUser(DEFAULT_USERS[newRole] || DEFAULT_USERS.PATIENT);
     try {
-      const res = await api.login(newRole);
+      const creds = DEMO_CREDENTIALS[newRole];
+      const res = await api.login(creds.username, creds.password);
       if (res?.success && res?.token) {
         setAuthToken(res.token);
         if (res.user) setUser(res.user as unknown as User);

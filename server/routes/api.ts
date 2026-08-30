@@ -1,4 +1,5 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
+import bcrypt from 'bcryptjs';
 import { db, genId } from '../db/store.js';
 import { ClinicalAIService } from '../services/clinicalEngine.js';
 import { RedFlagEngine } from '../services/redFlagEngine.js';
@@ -68,39 +69,40 @@ apiRouter.get('/events', requireAuth(), (req, res) => {
 });
 
 // 2. AUTHENTICATION & USERS --------------------------------------------------
-// PUBLIC ROUTE — issues the JWT used on every other endpoint.
+// PUBLIC ROUTE — the single entry point of the security boundary. EVERY login
+// (demo roles included) must present a valid username + password; the bcrypt
+// hash comparison is mandatory (SEC-006/SEC-007). No passwordless path exists.
 apiRouter.post('/auth/login', wrap(async (req, res) => {
-  const { username, password, role } = req.body;
+  const { username, password } = req.body;
 
-  let user: Awaited<ReturnType<typeof db.users.findByLogin>> = undefined;
-  let authMode: 'USERNAME_PASSWORD' | 'ROLE_DEMO' = 'ROLE_DEMO';
-
-  if (username) {
-    // Credential login: username must exist AND the password must match.
-    // (Demo seed stores plaintext password fields; SEC-002 will move these to
-    // salted hashes — the comparison point stays identical.)
-    user = await db.users.findByLogin(username);
-    authMode = 'USERNAME_PASSWORD';
-    if (!user || password !== user.passwordHash) {
-      await db.addAuditLog({
-        correlationId: 'AUTH-LOGIN',
-        actorId: username,
-        actorRole: 'PATIENT',
-        action: 'USER_LOGIN_FAILURE',
-        resourceType: 'USER',
-        resourceId: String(username),
-        details: { authMode, reason: 'INVALID_CREDENTIALS' },
-        ipAddress: req.ip || '127.0.0.1'
-      });
-      return res.status(401).json({ success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' });
-    }
-  } else if (role) {
-    // Demo kiosk flow: requesting a role selects its seeded demo account.
-    user = await db.users.findByLogin(undefined, role);
+  // Strict shape check: both credentials are always required.
+  if (typeof username !== 'string' || typeof password !== 'string' || username.length === 0 || password.length === 0) {
+    return res.status(401).json({
+      success: false,
+      code: 'INVALID_CREDENTIALS',
+      message: 'Username and password are required.'
+    });
   }
 
-  if (!user) {
-    return res.status(401).json({ success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid credentials.' });
+  const user = await db.users.findByLogin(username);
+
+  // Constant-work comparison: run bcrypt even for unknown usernames so
+  // response timing cannot enumerate valid accounts.
+  const BCRYPT_DUMMY_HASH = '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZUbE0f6b/6j3oA1sV8g2YQeXwJmR1e';
+  const passwordOk = await bcrypt.compare(password, user?.passwordHash ?? BCRYPT_DUMMY_HASH);
+
+  if (!user || !passwordOk) {
+    await db.addAuditLog({
+      correlationId: 'AUTH-LOGIN',
+      actorId: String(username),
+      actorRole: 'PATIENT',
+      action: 'USER_LOGIN_FAILURE',
+      resourceType: 'USER',
+      resourceId: String(username),
+      details: { reason: 'INVALID_CREDENTIALS' },
+      ipAddress: req.ip || '127.0.0.1'
+    });
+    return res.status(401).json({ success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' });
   }
 
   await db.addAuditLog({
@@ -110,7 +112,7 @@ apiRouter.post('/auth/login', wrap(async (req, res) => {
     action: 'USER_LOGIN_SUCCESS',
     resourceType: 'USER',
     resourceId: user.id,
-    details: { username: user.username, role: user.role, authMode },
+    details: { username: user.username, role: user.role, authMode: 'USERNAME_PASSWORD' },
     ipAddress: req.ip || '127.0.0.1'
   });
 
@@ -510,7 +512,9 @@ apiRouter.post('/demo/reset', requireAuth(...ALL), wrap(async (_req, res) => {
 }));
 
 apiRouter.get('/demo/state', requireAuth(...ALL), wrap(async (_req, res) => {
-  res.json(await db.snapshot());
+  const state = await db.snapshot();
+  // Never expose credential hashes, even to admins (not needed here).
+  res.json({ ...state, users: state.users.map(({ passwordHash: _ph, ...u }) => u) });
 }));
 
 // Centralized error handler — no stack traces leak to clients.

@@ -1,5 +1,8 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
+import { execFileSync } from 'child_process';
+import { encryptField, decryptField } from '../server/db/crypto.js';
 import { db } from '../server/db/store.js';
 import { seedDatabase } from '../server/db/seed.js';
 import { ClinicalAIService } from '../server/services/clinicalEngine.js';
@@ -165,6 +168,42 @@ async function runTestSuite() {
     'Raw SQL dump cannot read patient name/phone (defense against DB credential leak)');
   const decryptedList = await db.patients.list();
   assert(decryptedList.some(p => p.name === encName), 'ORM reads transparently decrypt PHI for authorized callers');
+
+  // Test 12: Cryptographic integrity & key management (SEC-008)
+  console.log('\n12. AES-256-GCM Integrity & Key Management:');
+  const secret = 'Smt. Confidential Devi —chest pain, Sulfa allergy+';
+  const envelope = encryptField(secret);
+  assert(envelope.startsWith('enc.v1.'), 'Encryption emits versioned enc.v1 envelopes');
+  assert(decryptField(envelope) === secret, 'Round-trip decrypt returns the exact plaintext');
+  assert(encryptField(secret) !== envelope, 'Random IV: identical plaintext encrypts to different ciphertext');
+
+  let tamperDetected = 0;
+  const segs = envelope.split('.').slice(1); // [iv, tag, ciphertext]
+  const tampered = [
+    envelope.slice(0, -2) + (envelope.endsWith('A') ? 'B' : 'A'),        // ciphertext flip
+    `enc.v1.${segs[0]}.${segs[1].slice(0, -2)}${segs[1].endsWith('A') ? 'B' : 'A'}.${segs[2]}`, // auth-tag flip
+    `enc.v1.${segs[0]}.${segs[2]}.${segs[1]}`                             // tag/ct swap
+  ];
+  for (const bad of tampered) {
+    try { decryptField(bad); } catch { tamperDetected++; }
+  }
+  assert(tamperDetected === tampered.length,
+    'GCM auth tag validated: ALL tampered ciphertexts fail decryption (no malleability oracle)');
+
+  // Production boot MUST refuse to start without a real key (SEC-008). The
+  // child runs in a scratch cwd so dotenv cannot re-supply .env secrets.
+  const scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), 'medikiosk-keyguard-'));
+  let bootRefused = false;
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', '-e',
+        `process.env.NODE_ENV='production'; delete process.env.APP_ENCRYPTION_KEY; process.chdir(${JSON.stringify(scratchDir)}); import(${JSON.stringify(path.resolve(process.cwd(), 'server/db/crypto.js'))}).then(m => m.decryptField('enc.v1.AA.BB.CC'))`],
+      { cwd: process.cwd(), stdio: 'pipe', timeout: 90_000 }
+    );
+  } catch { bootRefused = true; }
+  fs.rmSync(scratchDir, { recursive: true, force: true });
+  assert(bootRefused, 'Production mode refuses to run without APP_ENCRYPTION_KEY (fatal boot error)');
 
   // Test Summary
   console.log('\n======================================================');

@@ -37,7 +37,14 @@ declare global {
 
 function loadJwtSecret(): string {
   const secret = process.env.AUTH_JWT_SECRET;
-  if (secret && secret.length >= 32) return secret;
+  if (secret && secret.length >= 32) return secret; // never logged, never persisted
+  // SEC-008: in production a weak/missing JWT secret is a fatal boot error —
+  // tokens must never be signed with a guessable default.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'FATAL: AUTH_JWT_SECRET must be set to 32+ random characters in production. Refusing to start.'
+    );
+  }
   console.warn(
     '[Auth] AUTH_JWT_SECRET not set (or too short) — using derived development secret. Do NOT use in production.'
   );
