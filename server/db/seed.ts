@@ -1,3 +1,8 @@
+// ============================================================================
+// MediKiosk Demo Seed — executes entirely against PostgreSQL.
+// Previously this wrote a JSON blob to a flat file; it now seeds
+// the relational schema inside a single transaction (see store.resetDemoState).
+// ============================================================================
 import { db, DatabaseState } from './store.js';
 import { seededUsers, seededHospitals, seededDepartments, seededPractitioners } from './seedUsers.js';
 import {
@@ -41,20 +46,30 @@ export function getInitialSeedData(): DatabaseState {
   };
 }
 
-export function seedDatabase(forceReset: boolean = false): void {
-  const isLoaded = db.load();
-  if (!isLoaded || forceReset || db.getState().patients.length === 0) {
-    console.log('[Seed] Seeding MediKiosk database with realistic Indian clinical datasets...');
-    const seedData = getInitialSeedData();
-    db.setState(seedData);
-    console.log('[Seed] Database successfully seeded! Total patients:', seedData.patients.length);
-  } else {
-    console.log('[Seed] Existing database loaded with', db.getState().patients.length, 'patients.');
+/**
+ * Seeds the relational database with the demo dataset when it is empty, or
+ * force-resets it (`forceReset === true`, used by `npm run reset-demo` and the
+ * Demo Control Center). All writes happen in one SQL transaction.
+ */
+export async function seedDatabase(forceReset: boolean = false): Promise<void> {
+  const existingPatients = await db.patients.count();
+  if (!forceReset && existingPatients > 0) {
+    console.log('[Seed] Existing PostgreSQL database loaded with', existingPatients, 'patients.');
+    return;
   }
+  console.log('[Seed] Seeding MediKiosk PostgreSQL database with realistic Indian clinical datasets...');
+  const seedData = getInitialSeedData();
+  await db.resetDemoState(seedData);
+  console.log('[Seed] Database successfully seeded! Total patients:', seedData.patients.length);
 }
 
-// Auto-run if executed directly via npm run seed or reset-demo
+// Auto-run if executed directly via npm run seed / npm run reset-demo
 if (process.argv[1]?.includes('seed')) {
   const isReset = process.argv.includes('--reset');
-  seedDatabase(isReset);
+  seedDatabase(isReset)
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('[Seed] Failed:', err);
+      process.exit(1);
+    });
 }

@@ -42,8 +42,8 @@ export class HisAdapter {
       }
     };
 
-    // Log integration roundtrip
-    db.addIntegrationEvent({
+    // Log integration roundtrip (SQL insert)
+    await db.addIntegrationEvent({
       integrationType: 'HIS_EMR',
       direction: 'OUTBOUND',
       endpoint: 'https://his-demo.aiia.gov.in/api/v2/opd/encounter-preintake',

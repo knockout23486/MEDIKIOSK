@@ -1,5 +1,5 @@
-import express from 'express';
-import { db } from '../db/store.js';
+import express, { type Request, type Response, type NextFunction } from 'express';
+import { db, genId } from '../db/store.js';
 import { ClinicalAIService } from '../services/clinicalEngine.js';
 import { RedFlagEngine } from '../services/redFlagEngine.js';
 import { OcrEngine } from '../services/ocrEngine.js';
@@ -11,6 +11,14 @@ import { HisAdapter } from '../services/hisAdapter.js';
 import { seedDatabase } from '../db/seed.js';
 
 export const apiRouter = express.Router();
+
+// Every handler is async — wrap them so a rejected promise (SQL failure etc.)
+// becomes a controlled 500 instead of an unhandled rejection.
+const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    fn(req, res).catch(next);
+  };
+};
 
 // 1. REAL-TIME SERVER-SENT EVENTS (SSE)
 apiRouter.get('/events', (req, res) => {
@@ -35,12 +43,13 @@ apiRouter.get('/events', (req, res) => {
 });
 
 // 2. AUTHENTICATION & USERS
-apiRouter.post('/auth/login', (req, res) => {
+apiRouter.post('/auth/login', wrap(async (req, res) => {
   const { username, password, role } = req.body;
-  const state = db.getState();
-  const user = state.users.find(u => (u.username === username || u.role === role));
+  const user = await db.users.findByLogin(username, role);
   if (user) {
-    db.addAuditLog({
+    // NOTE (SEC-002, out of scope here): password is not yet verified — demo
+    // parity is retained. Audit trail now persists to PostgreSQL.
+    await db.addAuditLog({
       correlationId: 'AUTH-LOGIN',
       actorId: user.id,
       actorRole: user.role,
@@ -53,182 +62,98 @@ apiRouter.post('/auth/login', (req, res) => {
     return res.json({ success: true, user });
   }
   return res.status(401).json({ success: false, message: 'Invalid credentials' });
-});
+}));
 
-apiRouter.get('/users', (req, res) => {
-  res.json(db.getState().users);
-});
+apiRouter.get('/users', wrap(async (_req, res) => {
+  res.json(await db.users.list());
+}));
 
 // 3. PATIENTS & ABHA
-apiRouter.get('/patients', (req, res) => {
-  res.json(db.getState().patients);
-});
+apiRouter.get('/patients', wrap(async (_req, res) => {
+  res.json(await db.patients.list());
+}));
 
-apiRouter.get('/patients/:id', (req, res) => {
-  const patient = db.getState().patients.find(p => p.id === req.params.id || p.mkPatientId === req.params.id);
+apiRouter.get('/patients/:id', wrap(async (req, res) => {
+  const patient = await db.patients.get(req.params.id);
   if (!patient) return res.status(404).json({ message: 'Patient not found' });
   res.json(patient);
-});
+}));
 
-apiRouter.post('/patients', (req, res) => {
-  const state = db.getState();
-  const count = state.patients.length + 125;
-  const newPatient = {
-    id: 'PAT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-    mkPatientId: `MK-PAT-2026-${String(count).padStart(6, '0')}`,
-    registeredAt: new Date().toISOString(),
-    isDemo: true,
-    ...req.body
-  };
-  state.patients.push(newPatient);
-  db.save();
-
-  db.addAuditLog({
-    correlationId: 'PAT-REG',
-    actorId: newPatient.id,
-    actorRole: 'PATIENT',
-    action: 'PATIENT_REGISTERED',
-    resourceType: 'PATIENT',
-    resourceId: newPatient.id,
-    details: { mkPatientId: newPatient.mkPatientId, name: newPatient.name },
-    ipAddress: req.ip || '127.0.0.1'
-  });
-
+apiRouter.post('/patients', wrap(async (req, res) => {
+  if (!req.body || typeof req.body.name !== 'string' || req.body.name.trim() === '') {
+    return res.status(400).json({ success: false, message: 'Patient name is required' });
+  }
+  // Single SQL transaction: patient row + sequence-allocated MK-PAT id +
+  // DPDP audit entry. Safe under concurrent kiosk registrations.
+  const newPatient = await db.patients.register(req.body, { ipAddress: req.ip });
   res.json(newPatient);
-});
+}));
 
-apiRouter.post('/abha/verify', async (req, res) => {
+apiRouter.post('/abha/verify', wrap(async (req, res) => {
   const { abhaNumber, otp } = req.body;
   const result = await AbdmAdapter.verifyAbha(abhaNumber, otp);
   res.json(result);
-});
+}));
 
 // 4. CONSENTS
-apiRouter.get('/consents/:patientId', (req, res) => {
-  const consent = db.getState().consents.find(c => c.patientId === req.params.patientId);
+apiRouter.get('/consents/:patientId', wrap(async (req, res) => {
+  const consent = await db.consents.get(req.params.patientId);
   res.json(consent || null);
-});
+}));
 
-apiRouter.post('/consents', (req, res) => {
-  const state = db.getState();
-  const newConsent = {
-    id: 'CNS-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-    version: 'v2.4-DPDP-2026',
-    status: 'ACTIVE' as const,
-    grantedAt: new Date().toISOString(),
-    ipAddress: req.ip || '192.168.1.104 (Kiosk)',
-    signatureType: 'ELECTRONIC_DEMO' as const,
-    ...req.body
-  };
-
-  const existingIdx = state.consents.findIndex(c => c.patientId === newConsent.patientId);
-  if (existingIdx >= 0) {
-    state.consents[existingIdx] = newConsent;
-  } else {
-    state.consents.push(newConsent);
-  }
-  db.save();
-
-  db.addAuditLog({
-    correlationId: 'CONSENT-GRANT',
-    actorId: newConsent.patientId,
-    actorRole: 'PATIENT',
-    action: 'DPDP_CONSENT_GRANTED',
-    resourceType: 'CONSENT',
-    resourceId: newConsent.id,
-    details: newConsent.purposes,
-    ipAddress: req.ip || '127.0.0.1'
-  });
-
+apiRouter.post('/consents', wrap(async (req, res) => {
+  // Atomic upsert on patient_id + audit entry in one transaction.
+  const newConsent = await db.consents.grant(req.body, { ipAddress: req.ip });
   res.json(newConsent);
-});
+}));
 
 // 5. HOSPITALS, DEPARTMENTS & PRACTITIONERS
-apiRouter.get('/hospitals', (req, res) => {
-  res.json(db.getState().hospitals);
-});
+apiRouter.get('/hospitals', wrap(async (_req, res) => {
+  res.json(await db.reference.hospitals());
+}));
 
-apiRouter.get('/departments', (req, res) => {
+apiRouter.get('/departments', wrap(async (req, res) => {
   const { hospitalId } = req.query;
-  const deps = db.getState().departments.filter(d => !hospitalId || d.hospitalId === hospitalId);
-  res.json(deps);
-});
+  res.json(await db.reference.departments(typeof hospitalId === 'string' ? hospitalId : undefined));
+}));
 
-apiRouter.get('/doctors', (req, res) => {
+apiRouter.get('/doctors', wrap(async (req, res) => {
   const { departmentId, hospitalId } = req.query;
-  const docs = db.getState().practitioners.filter(d => 
-    (!departmentId || d.departmentId === departmentId) &&
-    (!hospitalId || d.hospitalId === hospitalId)
+  res.json(
+    await db.reference.practitioners({
+      departmentId: typeof departmentId === 'string' ? departmentId : undefined,
+      hospitalId: typeof hospitalId === 'string' ? hospitalId : undefined
+    })
   );
-  res.json(docs);
-});
+}));
 
 // 6. APPOINTMENTS & QUEUE
-apiRouter.get('/appointments', (req, res) => {
-  res.json(db.getState().appointments);
-});
+apiRouter.get('/appointments', wrap(async (_req, res) => {
+  res.json(await db.appointments.list());
+}));
 
-apiRouter.post('/appointments', (req, res) => {
-  const state = db.getState();
-  const count = state.appointments.length + 27;
-  const apt = {
-    id: 'APT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-    appointmentNumber: `APT-2026-0828-${String(count).padStart(3, '0')}`,
-    bookedAt: new Date().toISOString(),
-    status: 'BOOKED' as const,
-    ...req.body
-  };
-  state.appointments.push(apt);
+apiRouter.post('/appointments', wrap(async (req, res) => {
+  // Atomic: appointment + queue token + SMS notification + audit log.
+  const { appointment, token } = await db.appointments.book(req.body, { ipAddress: req.ip });
+  res.json({ appointment, token });
+}));
 
-  // Auto-generate Token
-  const token = QueueEngine.generateToken(apt.patientId, apt.id, apt.practitionerId);
+apiRouter.get('/queue/tokens', wrap(async (_req, res) => {
+  res.json(await db.queue.tokens());
+}));
 
-  db.addAuditLog({
-    correlationId: 'APT-BOOK',
-    actorId: apt.patientId,
-    actorRole: 'PATIENT',
-    action: 'APPOINTMENT_BOOKED',
-    resourceType: 'APPOINTMENT',
-    resourceId: apt.id,
-    details: { appointmentNumber: apt.appointmentNumber, tokenNumber: token.tokenNumber },
-    ipAddress: req.ip || '127.0.0.1'
-  });
-
-  // Add confirmation notification
-  db.addNotification({
-    patientId: apt.patientId,
-    channel: 'SMS',
-    title: 'Appointment Confirmed',
-    message: `Your appointment is confirmed. Token: ${token.tokenNumber}. Approx wait: ${token.estimatedWaitMins} mins.`,
-    status: 'DELIVERED'
-  });
-
-  res.json({ appointment: apt, token });
-});
-
-apiRouter.get('/queue/tokens', (req, res) => {
-  res.json(db.getState().queueTokens);
-});
-
-apiRouter.post('/queue/checkin', (req, res) => {
+apiRouter.post('/queue/checkin', wrap(async (req, res) => {
   const { tokenNumber, patientId } = req.body;
-  const state = db.getState();
-  const token = state.queueTokens.find(t => t.tokenNumber === tokenNumber || t.patientId === patientId);
+  const token = await db.queue.checkIn(tokenNumber, patientId);
   if (!token) return res.status(404).json({ message: 'Token not found' });
-
-  token.status = 'WAITING';
-  token.checkInTime = new Date().toISOString();
-  db.save();
-
-  db.broadcast('QUEUE_CHECKIN', token);
   res.json({ success: true, token });
-});
+}));
 
-apiRouter.post('/queue/advance', (req, res) => {
+apiRouter.post('/queue/advance', wrap(async (req, res) => {
   const { practitionerId } = req.body;
-  const nextToken = QueueEngine.advanceQueue(practitionerId || 'PRAC-01');
+  const nextToken = await QueueEngine.advanceQueue(practitionerId || 'PRAC-01');
   res.json({ success: true, activeToken: nextToken });
-});
+}));
 
 // 7. CLINICAL INTAKE & ADAPTIVE HISTORY
 apiRouter.post('/clinical/questions', (req, res) => {
@@ -237,27 +162,17 @@ apiRouter.post('/clinical/questions', (req, res) => {
   res.json(questions);
 });
 
-apiRouter.post('/clinical/session', (req, res) => {
-  const state = db.getState();
-  const session = {
-    id: 'SES-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-    startedAt: new Date().toISOString(),
-    status: 'IN_PROGRESS' as const,
-    redFlagTriggered: false,
-    ...req.body
-  };
-  state.clinicalSessions.push(session);
-  db.save();
+apiRouter.post('/clinical/session', wrap(async (req, res) => {
+  const session = await db.clinical.createSession(req.body);
   res.json(session);
-});
+}));
 
-apiRouter.post('/clinical/answer', (req, res) => {
+apiRouter.post('/clinical/answer', wrap(async (req, res) => {
   const { sessionId, questionId, questionText, answerText, inputMode, voiceTranscript, patientId } = req.body;
-  const state = db.getState();
-  const patient = state.patients.find(p => p.id === patientId);
+  const patient = patientId ? await db.patients.get(patientId) : undefined;
 
   const answer = {
-    id: 'ANS-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+    id: genId('ANS-'),
     sessionId,
     questionId,
     questionText,
@@ -270,8 +185,8 @@ apiRouter.post('/clinical/answer', (req, res) => {
     timestamp: new Date().toISOString()
   };
 
-  // Evaluate Emergency Red-Flags in real-time
-  const redFlag = RedFlagEngine.evaluateInput(
+  // Evaluate emergency red-flags in real time (alert persists via SQL tx).
+  const redFlag = await RedFlagEngine.evaluateInput(
     (voiceTranscript || answerText) + ' ' + questionText,
     { [questionId]: answerText },
     {
@@ -287,19 +202,17 @@ apiRouter.post('/clinical/answer', (req, res) => {
     answer.redFlagFlagged = true;
   }
 
-  state.clinicalAnswers.push(answer);
-  db.save();
+  await db.clinical.addAnswer(answer);
 
   res.json({ answer, redFlagAlert: redFlag });
-});
+}));
 
-apiRouter.post('/clinical/ayush', (req, res) => {
+apiRouter.post('/clinical/ayush', wrap(async (req, res) => {
   const { sessionId, answers } = req.body;
-  const state = db.getState();
   const prakritiCalc = ClinicalAIService.calculatePrakriti(answers || {});
 
   const assessment = {
-    id: 'AYUSH-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+    id: genId('AYUSH-'),
     sessionId,
     prakriti: {
       vata: prakritiCalc.vata,
@@ -329,248 +242,185 @@ apiRouter.post('/clinical/ayush', (req, res) => {
     sampraptiSummary: 'Prakupita Vata localizes in Janu Sandhi manifesting as Sandhivata (Osteoarthritis).'
   };
 
-  state.ayushAssessments.push(assessment);
-  db.save();
-
+  await db.clinical.saveAyushAssessment(assessment as any);
   res.json(assessment);
-});
+}));
 
 // 8. DOCUMENTS & OCR PIPELINE
-apiRouter.get('/documents/:patientId', (req, res) => {
-  const docs = db.getState().documents.filter(d => d.patientId === req.params.patientId);
-  res.json(docs);
-});
+apiRouter.get('/documents/:patientId', wrap(async (req, res) => {
+  res.json(await db.documents.listByPatient(req.params.patientId));
+}));
 
-apiRouter.post('/documents/process-demo', async (req, res) => {
+apiRouter.post('/documents/process-demo', wrap(async (req, res) => {
   const { documentId, patientId, fileName, rawText } = req.body;
-  const state = db.getState();
 
   const pipelineResult = await OcrEngine.processDocument(documentId, patientId, fileName, rawText);
 
-  state.documentOcrResults.push(pipelineResult.ocrResult);
-  for (const ent of pipelineResult.entities) {
-    state.medicalEntities.push(ent);
-  }
-  db.save();
-
-  db.addAuditLog({
-    correlationId: 'OCR-PROC',
-    actorId: 'AI_OCR_ENGINE',
-    actorRole: 'SYSTEM_ADMIN',
-    action: 'DOCUMENT_OCR_PROCESSED',
-    resourceType: 'DOCUMENT',
-    resourceId: documentId,
-    details: { entitiesCount: pipelineResult.entities.length, confidence: pipelineResult.ocrResult.confidence },
-    ipAddress: req.ip || '127.0.0.1'
-  });
+  // Atomic: OCR result + all extracted entities + audit log in one tx.
+  await db.documents.saveOcrPipeline(
+    pipelineResult.ocrResult,
+    pipelineResult.entities,
+    {
+      documentId,
+      entitiesCount: pipelineResult.entities.length,
+      confidence: pipelineResult.ocrResult.confidence,
+      ipAddress: req.ip
+    }
+  );
 
   res.json(pipelineResult);
-});
+}));
 
-apiRouter.get('/entities/:patientId', (req, res) => {
-  const entities = db.getState().medicalEntities.filter(e => e.patientId === req.params.patientId);
-  res.json(entities);
-});
+apiRouter.get('/entities/:patientId', wrap(async (req, res) => {
+  res.json(await db.documents.entitiesByPatient(req.params.patientId));
+}));
 
-apiRouter.post('/entities/:id/verify', (req, res) => {
-  const state = db.getState();
-  const entity = state.medicalEntities.find(e => e.id === req.params.id);
+apiRouter.post('/entities/:id/verify', wrap(async (req, res) => {
+  const entity = await db.documents.verifyEntity(req.params.id, {
+    name: req.body.name,
+    value: req.body.value
+  });
   if (!entity) return res.status(404).json({ message: 'Entity not found' });
-
-  entity.isVerified = true;
-  if (req.body.name) entity.name = req.body.name;
-  if (req.body.value) entity.value = req.body.value;
-  db.save();
-
   res.json({ success: true, entity });
-});
+}));
 
 // 9. TIMELINE & ABDM
-apiRouter.get('/timeline/:patientId', (req, res) => {
-  const events = db.getState().timelineEvents.filter(t => t.patientId === req.params.patientId);
-  res.json(events);
-});
+apiRouter.get('/timeline/:patientId', wrap(async (req, res) => {
+  res.json(await db.timeline.byPatient(req.params.patientId));
+}));
 
-apiRouter.get('/abdm/records/:patientId', (req, res) => {
-  const records = db.getState().abdmRecords.filter(r => r.patientId === req.params.patientId);
-  res.json(records);
-});
+apiRouter.get('/abdm/records/:patientId', wrap(async (req, res) => {
+  res.json(await db.abdm.recordsByPatient(req.params.patientId));
+}));
 
-apiRouter.get('/abdm/fhir/:patientId', (req, res) => {
-  const bundle = AbdmAdapter.generateFhirPatientBundle(req.params.patientId);
+apiRouter.get('/abdm/fhir/:patientId', wrap(async (req, res) => {
+  const bundle = await AbdmAdapter.generateFhirPatientBundle(req.params.patientId);
   res.json(bundle);
-});
+}));
 
 // 10. AI STRUCTURED SUMMARY
-apiRouter.get('/ai-summary/:sessionId', (req, res) => {
-  const summary = db.getState().aiSummaries.find(s => s.sessionId === req.params.sessionId);
+apiRouter.get('/ai-summary/:sessionId', wrap(async (req, res) => {
+  const summary = await db.summaries.bySession(req.params.sessionId);
   res.json(summary || null);
-});
+}));
 
-apiRouter.post('/ai-summary/generate', (req, res) => {
+apiRouter.post('/ai-summary/generate', wrap(async (req, res) => {
   const { sessionId, patientId } = req.body;
-  const summary = SummaryEngine.generateSummary(sessionId, patientId);
+  const summary = await SummaryEngine.generateSummary(sessionId, patientId);
   res.json(summary);
-});
+}));
 
-apiRouter.post('/ai-summary/:id/verify', (req, res) => {
-  const state = db.getState();
-  const summary = state.aiSummaries.find(s => s.id === req.params.id);
-  if (!summary) return res.status(404).json({ message: 'Summary not found' });
-
-  summary.status = 'PHYSICIAN_VERIFIED';
-  summary.version = (summary.version || 1) + 1;
-  summary.physicianVerifiedAt = new Date().toISOString();
-  summary.verifiedByDoctorId = req.body.doctorId || 'USR-DOC-01';
-  summary.doctorNotes = req.body.doctorNotes || 'Physician review complete. History confirmed with patient.';
-
-  if (req.body.chiefComplaint) summary.chiefComplaint = req.body.chiefComplaint;
-  if (req.body.historyOfPresentIllness) summary.historyOfPresentIllness = req.body.historyOfPresentIllness;
-
-  db.save();
-
-  db.addAuditLog({
-    correlationId: 'SUM-VERIFY',
-    actorId: summary.verifiedByDoctorId || 'USR-DOC-01',
-    actorRole: 'DOCTOR',
-    action: 'PHYSICIAN_VERIFIED_AI_SUMMARY',
-    resourceType: 'AI_SUMMARY',
-    resourceId: summary.id,
-    details: { version: summary.version, notes: summary.doctorNotes },
-    ipAddress: req.ip || '127.0.0.1'
+apiRouter.post('/ai-summary/:id/verify', wrap(async (req, res) => {
+  const summary = await db.summaries.verify(req.params.id, {
+    doctorId: req.body.doctorId,
+    doctorNotes: req.body.doctorNotes,
+    chiefComplaint: req.body.chiefComplaint,
+    historyOfPresentIllness: req.body.historyOfPresentIllness
   });
-
+  if (!summary) return res.status(404).json({ message: 'Summary not found' });
   res.json({ success: true, summary });
-});
+}));
 
 // 11. TRIAGE ALERTS
-apiRouter.get('/triage/alerts', (req, res) => {
-  res.json(db.getState().redFlagAlerts);
-});
+apiRouter.get('/triage/alerts', wrap(async (_req, res) => {
+  res.json(await db.alerts.list());
+}));
 
-apiRouter.post('/triage/acknowledge/:id', (req, res) => {
-  const state = db.getState();
-  const alert = state.redFlagAlerts.find(a => a.id === req.params.id);
+apiRouter.post('/triage/acknowledge/:id', wrap(async (req, res) => {
+  const alert = await db.alerts.acknowledge(req.params.id, {
+    acknowledgedBy: req.body.acknowledgedBy,
+    actionTaken: req.body.actionTaken
+  });
   if (!alert) return res.status(404).json({ message: 'Alert not found' });
-
-  alert.status = 'ACKNOWLEDGED';
-  alert.acknowledgedBy = req.body.acknowledgedBy || 'Sister Suniti Rao (Triage Nurse)';
-  alert.acknowledgedAt = new Date().toISOString();
-  alert.clinicalActionTaken = req.body.actionTaken || 'Patient prioritized in queue. Vitals checked.';
-  db.save();
-
-  db.broadcast('TRIAGE_ACKNOWLEDGED', alert);
   res.json({ success: true, alert });
-});
+}));
 
 // 12. CONSULTATION & PRESCRIPTION
-apiRouter.get('/consultations/:patientId', (req, res) => {
-  const state = db.getState();
-  const consultations = state.consultations.filter(c => c.patientId === req.params.patientId);
-  res.json(consultations);
-});
+apiRouter.get('/consultations/:patientId', wrap(async (req, res) => {
+  res.json(await db.consultations.byPatient(req.params.patientId));
+}));
 
-apiRouter.post('/consultations', (req, res) => {
-  const state = db.getState();
-  const consultation = {
-    id: 'CON-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-    startedAt: new Date().toISOString(),
-    status: 'IN_PROGRESS' as const,
-    ...req.body
-  };
-  state.consultations.push(consultation);
-  db.save();
+apiRouter.post('/consultations', wrap(async (req, res) => {
+  const consultation = await db.consultations.create(req.body);
   res.json(consultation);
-});
+}));
 
-apiRouter.post('/consultations/:id/finalize', async (req, res) => {
-  const state = db.getState();
-  const consultation = state.consultations.find(c => c.id === req.params.id) || {
+apiRouter.post('/consultations/:id/finalize', wrap(async (req, res) => {
+  const existing = (await db.consultations.byPatient(req.body.patientId || ''))
+    .find((c) => c.id === req.params.id);
+
+  const consultation = existing || {
     id: req.params.id,
-    appointmentId: req.body.appointmentId,
-    patientId: req.body.patientId,
+    appointmentId: req.body.appointmentId || '',
+    patientId: req.body.patientId || '',
     practitionerId: req.body.practitionerId || 'PRAC-01',
     aiSummaryId: req.body.aiSummaryId || 'SUM-HERO-01',
-    clinicalExamination: req.body.clinicalExamination || { generalAppearance: 'Conscious, oriented', vitals: { bp: '124/82 mmHg', pulse: '76 bpm', temp: '98.4 F', spo2: '99%', respRate: '16/min' }, systemicExam: 'Knee joints: Crepitus on flexion, no warm effusion' },
+    clinicalExamination: req.body.clinicalExamination || {
+      generalAppearance: 'Conscious, oriented',
+      vitals: { bp: '124/82 mmHg', pulse: '76 bpm', temp: '98.4 F', spo2: '99%', respRate: '16/min' },
+      systemicExam: 'Knee joints: Crepitus on flexion, no warm effusion'
+    },
     assessment: req.body.assessment || 'Janu Sandhivata (Bilateral Knee Osteoarthritis) with Mandagni',
-    finalDiagnosis: req.body.finalDiagnosis || [{ code: 'M17.0', name: 'Primary Bilateral Osteoarthritis of Knee', system: 'ICD11' }, { code: 'NAMASTE-AYU-042', name: 'Janu Sandhivata', system: 'NAMASTE_AYUSH' }],
+    finalDiagnosis: req.body.finalDiagnosis || [
+      { code: 'M17.0', name: 'Primary Bilateral Osteoarthritis of Knee', system: 'ICD11' },
+      { code: 'NAMASTE-AYU-042', name: 'Janu Sandhivata', system: 'NAMASTE_AYUSH' }
+    ],
     ayushChikitsaSutra: 'Vatahara, Shoolahara, Agni-Deepana & Rasayana Chikitsa',
     followUpDate: req.body.followUpDate || '2026-09-28',
-    dietLifestyleAdvice: req.body.dietLifestyleAdvice || ['Avoid cold and dry items', 'Daily mild warm oil massage (Mahanarayana Taila)', 'Avoid squatting on floor'],
+    dietLifestyleAdvice: req.body.dietLifestyleAdvice || [
+      'Avoid cold and dry items',
+      'Daily mild warm oil massage (Mahanarayana Taila)',
+      'Avoid squatting on floor'
+    ],
     status: 'FINALIZED' as const,
     startedAt: new Date().toISOString(),
     finalizedAt: new Date().toISOString()
-  };
+  } as any;
 
-  if (!state.consultations.find(c => c.id === consultation.id)) {
-    state.consultations.push(consultation);
-  } else {
-    consultation.status = 'FINALIZED';
-    consultation.finalizedAt = new Date().toISOString();
-  }
+  // Atomic: consultation upsert + prescription items + audit log.
+  const finalized = await db.consultations.finalize(
+    consultation,
+    Array.isArray(req.body.prescriptions) ? req.body.prescriptions : [],
+    { ipAddress: req.ip }
+  );
 
-  // Save prescriptions
-  if (req.body.prescriptions && Array.isArray(req.body.prescriptions)) {
-    for (const rx of req.body.prescriptions) {
-      state.prescriptions.push({
-        id: 'RX-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-        consultationId: consultation.id,
-        ...rx
-      });
-    }
-  }
-
-  // Sync to HIS EMR Gateway
+  // Sync to HIS EMR Gateway AFTER the clinical data is safely committed.
   await HisAdapter.syncPreIntakeEncounter({
-    encounterId: consultation.id,
-    patientId: consultation.patientId,
-    practitionerId: consultation.practitionerId,
+    encounterId: finalized.id,
+    patientId: finalized.patientId,
+    practitionerId: finalized.practitionerId,
     departmentId: 'DEP-01',
-    chiefComplaint: consultation.assessment,
-    aiSummaryId: consultation.aiSummaryId,
+    chiefComplaint: finalized.assessment,
+    aiSummaryId: finalized.aiSummaryId,
     intakeTimestamp: new Date().toISOString()
   });
 
-  db.save();
-
-  db.addAuditLog({
-    correlationId: 'CON-FINAL',
-    actorId: consultation.practitionerId,
-    actorRole: 'DOCTOR',
-    action: 'CONSULTATION_FINALIZED',
-    resourceType: 'CONSULTATION',
-    resourceId: consultation.id,
-    details: { diagnosis: consultation.finalDiagnosis, prescriptionsCount: req.body.prescriptions?.length || 0 },
-    ipAddress: req.ip || '127.0.0.1'
-  });
-
-  res.json({ success: true, consultation });
-});
+  res.json({ success: true, consultation: finalized });
+}));
 
 // 13. NOTIFICATIONS, AUDIT & SYSTEM HEALTH
-apiRouter.get('/notifications/:patientId', (req, res) => {
-  const notifs = db.getState().notifications.filter(n => n.patientId === req.params.patientId);
-  res.json(notifs);
-});
+apiRouter.get('/notifications/:patientId', wrap(async (req, res) => {
+  res.json(await db.notifications.byPatient(req.params.patientId));
+}));
 
-apiRouter.get('/audit/logs', (req, res) => {
-  res.json(db.getState().auditLogs);
-});
+apiRouter.get('/audit/logs', wrap(async (_req, res) => {
+  res.json(await db.auditLogs.list());
+}));
 
-apiRouter.get('/system/health', (req, res) => {
-  res.json(db.getState().systemHealth);
-});
+apiRouter.get('/system/health', wrap(async (_req, res) => {
+  res.json(await db.systemHealth.list());
+}));
 
-apiRouter.get('/integrations/events', (req, res) => {
-  res.json(db.getState().integrationEvents);
-});
+apiRouter.get('/integrations/events', wrap(async (_req, res) => {
+  res.json(await db.integrationEvents.list());
+}));
 
 // 14. DEMO CONTROL CENTER
-apiRouter.post('/demo/reset', (req, res) => {
-  seedDatabase(true);
+apiRouter.post('/demo/reset', wrap(async (_req, res) => {
+  await seedDatabase(true);
   res.json({ success: true, message: 'MediKiosk demo environment reset to pristine initial state.' });
-});
+}));
 
-apiRouter.get('/demo/state', (req, res) => {
-  res.json(db.getState());
-});
+apiRouter.get('/demo/state', wrap(async (_req, res) => {
+  res.json(await db.snapshot());
+}));

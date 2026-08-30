@@ -59,11 +59,11 @@ export const RED_FLAG_RULES: RedFlagRule[] = [
 ];
 
 export class RedFlagEngine {
-  public static evaluateInput(
+  public static async evaluateInput(
     input: string,
     structuredAnswers: Record<string, string>,
     patientInfo: { id: string; name: string; age: number; gender: string; tokenNumber?: string; sessionId: string }
-  ): RedFlagAlert | null {
+  ): Promise<RedFlagAlert | null> {
     const textLower = (input + ' ' + Object.values(structuredAnswers).join(' ')).toLowerCase();
 
     for (const rule of RED_FLAG_RULES) {
@@ -110,35 +110,9 @@ export class RedFlagEngine {
           status: 'PENDING'
         };
 
-        // Add to database state
-        const state = db.getState();
-        state.redFlagAlerts.unshift(alert);
-
-        // Escalate token priority if exists
-        const token = state.queueTokens.find(t => t.patientId === patientInfo.id);
-        if (token) {
-          token.priority = 'EMERGENCY';
-          token.status = 'TRIAGE_URGENT';
-          token.estimatedWaitMins = 1;
-        }
-
-        // Add audit log
-        db.addAuditLog({
-          correlationId: 'CORR-RFA-' + alert.id,
-          actorId: 'RED_FLAG_SAFETY_ENGINE',
-          actorRole: 'SYSTEM_ADMIN',
-          action: 'EMERGENCY_RED_FLAG_TRIGGERED',
-          resourceType: 'RED_FLAG_ALERT',
-          resourceId: alert.id,
-          details: { ruleId: rule.id, severity: rule.severity, triggerInput: alert.triggerInput },
-          ipAddress: '127.0.0.1'
-        });
-
-        // Broadcast real-time SSE event to Triage dashboard
-        db.broadcast('RED_FLAG_TRIGGERED', alert);
-        db.save();
-
-        return alert;
+        // Persist alert + escalate queue priority + audit log in one SQL
+        // transaction, then broadcast to the triage dashboard over SSE.
+        return db.alerts.raise(alert);
       }
     }
 
