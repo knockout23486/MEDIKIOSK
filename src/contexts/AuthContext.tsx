@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types/index.js';
+import { api, setAuthToken, getAuthToken } from '../services/api.js';
 
 interface AuthContextType {
   user: User;
   role: UserRole;
+  isAuthenticated: boolean;
   setRole: (role: UserRole) => void;
   switchUser: (role: UserRole) => void;
 }
@@ -67,14 +69,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [role, setRoleState] = useState<UserRole>('PATIENT');
   const [user, setUser] = useState<User>(DEFAULT_USERS.PATIENT);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!getAuthToken());
 
-  const switchUser = (newRole: UserRole) => {
+  /**
+   * Authenticates against the API and caches the issued JWT (SEC-003): every
+   * subsequent api.* call carries `Authorization: Bearer <token>`. Falls back
+   * to the local demo profile when the API is unreachable (offline demo mode).
+   */
+  const switchUser = async (newRole: UserRole) => {
     setRoleState(newRole);
     setUser(DEFAULT_USERS[newRole] || DEFAULT_USERS.PATIENT);
+    try {
+      const res = await api.login(newRole);
+      if (res?.success && res?.token) {
+        setAuthToken(res.token);
+        if (res.user) setUser(res.user as unknown as User);
+        setIsAuthenticated(true);
+      }
+    } catch (e) {
+      console.warn('[Auth] API login failed — continuing in offline demo mode.', e);
+    }
   };
 
+  // Establish the default kiosk session on first render.
+  useEffect(() => {
+    void switchUser('PATIENT');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, role, setRole: switchUser, switchUser }}>
+    <AuthContext.Provider value={{ user, role, isAuthenticated, setRole: switchUser, switchUser }}>
       {children}
     </AuthContext.Provider>
   );

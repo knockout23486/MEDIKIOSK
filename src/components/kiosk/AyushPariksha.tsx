@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext.js';
 import { useDemo } from '../../contexts/DemoContext.js';
 import { api } from '../../services/api.js';
-import { Sparkles, ArrowLeft, ArrowRight, CheckCircle2, Flame, RefreshCw } from 'lucide-react';
+import { Sparkles, ArrowLeft, ArrowRight, CheckCircle2, Flame, RefreshCw, Activity } from 'lucide-react';
 
 interface AyushParikshaProps {
   onCompleted: (assessment: any) => void;

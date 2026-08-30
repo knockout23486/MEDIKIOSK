@@ -152,6 +152,20 @@ async function runTestSuite() {
   const auditCountAfter = (await db.auditLogs.list(10000)).length;
   assert(auditCountAfter > auditCountBefore, 'Patient registration wrote patient + audit rows in one committed transaction');
 
+  // Test 11: Application-level PHI encryption at rest (SEC-004)
+  console.log('\n11. Application-Level PHI Encryption (AES-256-GCM):');
+  const encName = 'Encryption Verification Citizen';
+  await db.patients.register({ name: encName, age: 28, gender: 'FEMALE', phone: '+91 90000 12345' });
+  const rawRows = await db.pool.query(
+    'SELECT name, phone FROM patients ORDER BY registered_at DESC LIMIT 1'
+  );
+  const rawName = rawRows.rows[0].name as string;
+  assert(rawName.startsWith('enc.v1.'), 'Direct identifiers stored as enc.v1 ciphertext in PostgreSQL (not plaintext)');
+  assert(!rawName.includes(encName) && !(rawRows.rows[0].phone as string).includes('90000'),
+    'Raw SQL dump cannot read patient name/phone (defense against DB credential leak)');
+  const decryptedList = await db.patients.list();
+  assert(decryptedList.some(p => p.name === encName), 'ORM reads transparently decrypt PHI for authorized callers');
+
   // Test Summary
   console.log('\n======================================================');
   console.log(`Results: ${passed} Passed, ${failed} Failed`);

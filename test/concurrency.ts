@@ -59,12 +59,25 @@ async function main() {
   const patientsBefore = await db.patients.count();
   const tokensBefore = (await db.queue.tokens()).length;
 
+  // SEC-003: obtain a real JWT session (PATIENT role may register + book).
+  const loginRes = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'PATIENT' })
+  }).then(r => r.json());
+  if (!loginRes?.token) throw new Error('Login failed — cannot run concurrency test.');
+  const authHeaders = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${loginRes.token}`
+  };
+  console.log('  Authenticated as PATIENT (JWT issued, 12h expiry)');
+
   // --- 1. Simultaneous patient registrations -------------------------------
   console.log(`\n  Firing ${N_REGISTRATIONS} simultaneous POST /api/patients ...`);
   const registrationJobs = Array.from({ length: N_REGISTRATIONS }, (_, i) =>
     fetch(`${base}/api/patients`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({
         name: `Load Test Patient ${i + 1}`,
         age: 20 + (i % 60),
@@ -85,7 +98,7 @@ async function main() {
   const bookingJobs = Array.from({ length: N_BOOKINGS }, (_, i) =>
     fetch(`${base}/api/appointments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders,
       body: JSON.stringify({
         patientId: 'PAT-HERO-01',
         practitionerId: 'PRAC-01',

@@ -17,7 +17,8 @@
     "seed": "tsx server/db/seed.ts",
     "reset-demo": "tsx server/db/seed.ts --reset",
     "test": "tsx test/run-tests.ts",
-    "test:concurrency": "tsx test/concurrency.ts"
+    "test:concurrency": "tsx test/concurrency.ts",
+    "test:auth": "tsx test/auth.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -25,6 +26,7 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.45.2",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.16.0",
     "multer": "^1.4.5-lts.1",
     "pg": "^8.23.0",
@@ -37,6 +39,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.1",
     "@types/pg": "^8.23.1",

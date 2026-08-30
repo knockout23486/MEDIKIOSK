@@ -50,7 +50,8 @@ manager, never in git.
 | `npm run db:migrate` | Apply pending migrations |
 | `npm run db:studio` | Drizzle Studio DB browser |
 | `npm test` | Functional test suite (requires PostgreSQL) |
-| `npm run test:concurrency` | **SEC-001 regression**: 80 simultaneous HTTP registrations/bookings; asserts zero locks, zero duplicate ids, zero corrupted rows, zero filesystem writes |
+| `npm run test:auth` | **SEC-003 regression**: 401 on all 41 protected endpoints, forged/expired token rejection, 403 RBAC matrix, IDOR ownership |
+| `npm run test:concurrency` | **SEC-001 regression**: 80 simultaneous authenticated registrations/bookings; zero locks, duplicate ids, corrupted rows, or filesystem writes |
 
 ## Health check
 
@@ -58,10 +59,35 @@ manager, never in git.
 round-trip latency — a failing DB yields `503 DEGRADED` instead of silently
 serving stale state.
 
-## Security notes
+## Security architecture
 
-* SEC-001 (flat-file storage) is remediated here: relational storage, ACID
-  transactions, sequence-backed identifiers, committed migrations.
-* Still open for future audits: password verification on demo login (SEC-002
-  area), TLS/ABDM production credential handling, and encryption-at-rest
-  (delegate to the managed database layer, e.g. RDS storage encryption).
+* **SEC-001 (fixed)** — PostgreSQL + Drizzle ORM: ACID transactions,
+  sequence-backed business identifiers, `SELECT ... FOR UPDATE` queue locking,
+  committed SQL migrations.
+* **SEC-003 (fixed)** — every `/api` route is guarded by JWT middleware
+  (`server/middleware/auth.ts`): `Authorization: Bearer <HS256 JWT>` required
+  (401 otherwise), per-route RBAC allow-lists (403 otherwise, denials audited),
+  and PATIENT-role reads enforce record ownership (IDOR protection via
+  `patients.user_id`). The only public route is `POST /api/auth/login`.
+  The SSE stream accepts the token via `?token=` (EventSource cannot set
+  headers). Regression: `npm run test:auth` — 41 endpoints × 401 sweep,
+  forgery/expiry cases, 11-case 403 matrix, IDOR checks.
+* **SEC-004 (fixed)** — application-level AES-256-GCM encryption
+  (`server/db/crypto.ts`) for PHI columns (patient identity, clinical free
+  text, consent purposes, FHIR payloads). Ciphertext is unreadable even with
+  direct database credentials; the key (`APP_ENCRYPTION_KEY`) never leaves the
+  application. Verify: `npm test` asserts raw SQL sees only `enc.v1.*` blobs.
+* **SEC-005 (fixed)** — the `AyushPariksha.tsx` TypeScript error is resolved;
+  `npm run build` and `tsc --noEmit` are clean for client and server.
+* Still open for future audits (SEC-002 area): demo role-login issues tokens
+  without a password (kiosk UX parity) — seed users still carry plaintext
+  password fields awaiting migration to salted hashes; TLS termination and
+  ABDM production credentials are deployment concerns.
+
+## Test suites (all require PostgreSQL)
+
+| Script | Covers |
+| --- | --- |
+| `npm test` | 34 functional assertions: engines, transactions, PHI encryption-at-rest |
+| `npm run test:concurrency` | 80 simultaneous HTTP registrations/bookings — no locks/duplicates/corruption |
+| `npm run test:auth` | SEC-003 regression: 401 sweep, forged/expired tokens, 403 RBAC matrix, IDOR |

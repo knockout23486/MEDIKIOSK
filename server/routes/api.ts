@@ -9,8 +9,25 @@ import { QueueEngine } from '../services/queueEngine.js';
 import { AbdmAdapter } from '../services/abdmAdapter.js';
 import { HisAdapter } from '../services/hisAdapter.js';
 import { seedDatabase } from '../db/seed.js';
+import { requireAuth, signToken, JWT_EXPIRES_IN } from '../middleware/auth.js';
+import type { UserRole } from '../db/schema.js';
 
 export const apiRouter = express.Router();
+
+// ============================================================================
+// SECURITY BOUNDARY (SEC-003)
+// ----------------------------------------------------------------------------
+// Every route below is guarded by `requireAuth(...roles)`:
+//   * a valid `Authorization: Bearer <JWT>` is required — 401 otherwise;
+//   * the caller's role must be in the route's allow-list — 403 otherwise;
+//   * PATIENT-role reads of individual records additionally enforce record
+//     ownership (IDOR protection).
+// The ONLY public endpoint is POST /api/auth/login.
+// ============================================================================
+
+// Roles
+const STAFF_READ: UserRole[] = ['DOCTOR', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'];
+const ALL: UserRole[] = ['PATIENT', 'DOCTOR', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'];
 
 // Every handler is async — wrap them so a rejected promise (SQL failure etc.)
 // becomes a controlled 500 instead of an unhandled rejection.
@@ -20,8 +37,16 @@ const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) => {
   };
 };
 
-// 1. REAL-TIME SERVER-SENT EVENTS (SSE)
-apiRouter.get('/events', (req, res) => {
+/** PATIENT-role ownership guard: may a PATIENT read this patient's data? */
+async function patientReadableByCaller(patientId: string, user: { id: string; role: UserRole }): Promise<boolean> {
+  if (user.role !== 'PATIENT') return true; // staff access is governed by RBAC
+  const patient = await db.patients.get(patientId);
+  return !!patient && patient.userId === user.id;
+}
+
+// 1. REAL-TIME SERVER-SENT EVENTS (SSE) — authenticated (token via query param,
+//    because EventSource cannot set HTTP headers).
+apiRouter.get('/events', requireAuth(), (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -42,82 +67,127 @@ apiRouter.get('/events', (req, res) => {
   });
 });
 
-// 2. AUTHENTICATION & USERS
+// 2. AUTHENTICATION & USERS --------------------------------------------------
+// PUBLIC ROUTE — issues the JWT used on every other endpoint.
 apiRouter.post('/auth/login', wrap(async (req, res) => {
   const { username, password, role } = req.body;
-  const user = await db.users.findByLogin(username, role);
-  if (user) {
-    // NOTE (SEC-002, out of scope here): password is not yet verified — demo
-    // parity is retained. Audit trail now persists to PostgreSQL.
-    await db.addAuditLog({
-      correlationId: 'AUTH-LOGIN',
-      actorId: user.id,
-      actorRole: user.role,
-      action: 'USER_LOGIN_SUCCESS',
-      resourceType: 'USER',
-      resourceId: user.id,
-      details: { username: user.username, role: user.role },
-      ipAddress: req.ip || '127.0.0.1'
-    });
-    return res.json({ success: true, user });
+
+  let user: Awaited<ReturnType<typeof db.users.findByLogin>> = undefined;
+  let authMode: 'USERNAME_PASSWORD' | 'ROLE_DEMO' = 'ROLE_DEMO';
+
+  if (username) {
+    // Credential login: username must exist AND the password must match.
+    // (Demo seed stores plaintext password fields; SEC-002 will move these to
+    // salted hashes — the comparison point stays identical.)
+    user = await db.users.findByLogin(username);
+    authMode = 'USERNAME_PASSWORD';
+    if (!user || password !== user.passwordHash) {
+      await db.addAuditLog({
+        correlationId: 'AUTH-LOGIN',
+        actorId: username,
+        actorRole: 'PATIENT',
+        action: 'USER_LOGIN_FAILURE',
+        resourceType: 'USER',
+        resourceId: String(username),
+        details: { authMode, reason: 'INVALID_CREDENTIALS' },
+        ipAddress: req.ip || '127.0.0.1'
+      });
+      return res.status(401).json({ success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' });
+    }
+  } else if (role) {
+    // Demo kiosk flow: requesting a role selects its seeded demo account.
+    user = await db.users.findByLogin(undefined, role);
   }
-  return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+  if (!user) {
+    return res.status(401).json({ success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid credentials.' });
+  }
+
+  await db.addAuditLog({
+    correlationId: 'AUTH-LOGIN',
+    actorId: user.id,
+    actorRole: user.role,
+    action: 'USER_LOGIN_SUCCESS',
+    resourceType: 'USER',
+    resourceId: user.id,
+    details: { username: user.username, role: user.role, authMode },
+    ipAddress: req.ip || '127.0.0.1'
+  });
+
+  const token = signToken(user);
+  const { passwordHash: _ph, ...safeUser } = user;
+  return res.json({ success: true, user: safeUser, token, tokenType: 'Bearer', expiresIn: JWT_EXPIRES_IN });
 }));
 
-apiRouter.get('/users', wrap(async (_req, res) => {
-  res.json(await db.users.list());
+// Session introspection for the client.
+apiRouter.get('/auth/me', requireAuth(), wrap(async (req, res) => {
+  res.json({ success: true, user: req.user, expires: JWT_EXPIRES_IN });
 }));
 
-// 3. PATIENTS & ABHA
-apiRouter.get('/patients', wrap(async (_req, res) => {
+apiRouter.get('/users', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
+  const users = await db.users.list();
+  res.json(users.map(({ passwordHash: _ph, ...u }) => u));
+}));
+
+// 3. PATIENTS & ABHA -----------------------------------------------------------
+apiRouter.get('/patients', requireAuth(...STAFF_READ), wrap(async (_req, res) => {
   res.json(await db.patients.list());
 }));
 
-apiRouter.get('/patients/:id', wrap(async (req, res) => {
+apiRouter.get('/patients/:id', requireAuth(), wrap(async (req, res) => {
   const patient = await db.patients.get(req.params.id);
   if (!patient) return res.status(404).json({ message: 'Patient not found' });
-  res.json(patient);
+  // IDOR protection: a PATIENT token may only read its OWN record.
+  if (req.user!.role === 'PATIENT' && patient.userId !== req.user!.id) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own record.' });
+  }
+  const { userId: _u, ...safe } = patient;
+  res.json(safe);
 }));
 
-apiRouter.post('/patients', wrap(async (req, res) => {
+apiRouter.post('/patients', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   if (!req.body || typeof req.body.name !== 'string' || req.body.name.trim() === '') {
     return res.status(400).json({ success: false, message: 'Patient name is required' });
   }
   // Single SQL transaction: patient row + sequence-allocated MK-PAT id +
   // DPDP audit entry. Safe under concurrent kiosk registrations.
   const newPatient = await db.patients.register(req.body, { ipAddress: req.ip });
-  res.json(newPatient);
+  const { userId: _u, ...safe } = newPatient;
+  res.json(safe);
 }));
 
-apiRouter.post('/abha/verify', wrap(async (req, res) => {
+apiRouter.post('/abha/verify', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   const { abhaNumber, otp } = req.body;
   const result = await AbdmAdapter.verifyAbha(abhaNumber, otp);
   res.json(result);
 }));
 
-// 4. CONSENTS
-apiRouter.get('/consents/:patientId', wrap(async (req, res) => {
+// 4. CONSENTS --------------------------------------------------------------------
+apiRouter.get('/consents/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own consent record.' });
+  }
   const consent = await db.consents.get(req.params.patientId);
   res.json(consent || null);
 }));
 
-apiRouter.post('/consents', wrap(async (req, res) => {
+apiRouter.post('/consents', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   // Atomic upsert on patient_id + audit entry in one transaction.
   const newConsent = await db.consents.grant(req.body, { ipAddress: req.ip });
   res.json(newConsent);
 }));
 
-// 5. HOSPITALS, DEPARTMENTS & PRACTITIONERS
-apiRouter.get('/hospitals', wrap(async (_req, res) => {
+// 5. HOSPITALS, DEPARTMENTS & PRACTITIONERS (non-PHI reference data) -------------
+apiRouter.get('/hospitals', requireAuth(...ALL), wrap(async (_req, res) => {
   res.json(await db.reference.hospitals());
 }));
 
-apiRouter.get('/departments', wrap(async (req, res) => {
+apiRouter.get('/departments', requireAuth(...ALL), wrap(async (req, res) => {
   const { hospitalId } = req.query;
   res.json(await db.reference.departments(typeof hospitalId === 'string' ? hospitalId : undefined));
 }));
 
-apiRouter.get('/doctors', wrap(async (req, res) => {
+apiRouter.get('/doctors', requireAuth(...ALL), wrap(async (req, res) => {
   const { departmentId, hospitalId } = req.query;
   res.json(
     await db.reference.practitioners({
@@ -127,47 +197,47 @@ apiRouter.get('/doctors', wrap(async (req, res) => {
   );
 }));
 
-// 6. APPOINTMENTS & QUEUE
-apiRouter.get('/appointments', wrap(async (_req, res) => {
+// 6. APPOINTMENTS & QUEUE ----------------------------------------------------------
+apiRouter.get('/appointments', requireAuth(...STAFF_READ), wrap(async (_req, res) => {
   res.json(await db.appointments.list());
 }));
 
-apiRouter.post('/appointments', wrap(async (req, res) => {
+apiRouter.post('/appointments', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   // Atomic: appointment + queue token + SMS notification + audit log.
   const { appointment, token } = await db.appointments.book(req.body, { ipAddress: req.ip });
   res.json({ appointment, token });
 }));
 
-apiRouter.get('/queue/tokens', wrap(async (_req, res) => {
+apiRouter.get('/queue/tokens', requireAuth(...STAFF_READ), wrap(async (_req, res) => {
   res.json(await db.queue.tokens());
 }));
 
-apiRouter.post('/queue/checkin', wrap(async (req, res) => {
+apiRouter.post('/queue/checkin', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   const { tokenNumber, patientId } = req.body;
   const token = await db.queue.checkIn(tokenNumber, patientId);
   if (!token) return res.status(404).json({ message: 'Token not found' });
   res.json({ success: true, token });
 }));
 
-apiRouter.post('/queue/advance', wrap(async (req, res) => {
+apiRouter.post('/queue/advance', requireAuth('DOCTOR', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   const { practitionerId } = req.body;
   const nextToken = await QueueEngine.advanceQueue(practitionerId || 'PRAC-01');
   res.json({ success: true, activeToken: nextToken });
 }));
 
-// 7. CLINICAL INTAKE & ADAPTIVE HISTORY
-apiRouter.post('/clinical/questions', (req, res) => {
+// 7. CLINICAL INTAKE & ADAPTIVE HISTORY ----------------------------------------------
+apiRouter.post('/clinical/questions', requireAuth(...ALL), (req, res) => {
   const { chiefComplaint, isAyush } = req.body;
   const questions = ClinicalAIService.getInitialQuestions(chiefComplaint || '', !!isAyush);
   res.json(questions);
 });
 
-apiRouter.post('/clinical/session', wrap(async (req, res) => {
+apiRouter.post('/clinical/session', requireAuth(...ALL), wrap(async (req, res) => {
   const session = await db.clinical.createSession(req.body);
   res.json(session);
 }));
 
-apiRouter.post('/clinical/answer', wrap(async (req, res) => {
+apiRouter.post('/clinical/answer', requireAuth(...ALL), wrap(async (req, res) => {
   const { sessionId, questionId, questionText, answerText, inputMode, voiceTranscript, patientId } = req.body;
   const patient = patientId ? await db.patients.get(patientId) : undefined;
 
@@ -207,7 +277,7 @@ apiRouter.post('/clinical/answer', wrap(async (req, res) => {
   res.json({ answer, redFlagAlert: redFlag });
 }));
 
-apiRouter.post('/clinical/ayush', wrap(async (req, res) => {
+apiRouter.post('/clinical/ayush', requireAuth(...ALL), wrap(async (req, res) => {
   const { sessionId, answers } = req.body;
   const prakritiCalc = ClinicalAIService.calculatePrakriti(answers || {});
 
@@ -246,12 +316,15 @@ apiRouter.post('/clinical/ayush', wrap(async (req, res) => {
   res.json(assessment);
 }));
 
-// 8. DOCUMENTS & OCR PIPELINE
-apiRouter.get('/documents/:patientId', wrap(async (req, res) => {
+// 8. DOCUMENTS & OCR PIPELINE -----------------------------------------------------------
+apiRouter.get('/documents/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own documents.' });
+  }
   res.json(await db.documents.listByPatient(req.params.patientId));
 }));
 
-apiRouter.post('/documents/process-demo', wrap(async (req, res) => {
+apiRouter.post('/documents/process-demo', requireAuth(...ALL), wrap(async (req, res) => {
   const { documentId, patientId, fileName, rawText } = req.body;
 
   const pipelineResult = await OcrEngine.processDocument(documentId, patientId, fileName, rawText);
@@ -271,11 +344,14 @@ apiRouter.post('/documents/process-demo', wrap(async (req, res) => {
   res.json(pipelineResult);
 }));
 
-apiRouter.get('/entities/:patientId', wrap(async (req, res) => {
+apiRouter.get('/entities/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own entities.' });
+  }
   res.json(await db.documents.entitiesByPatient(req.params.patientId));
 }));
 
-apiRouter.post('/entities/:id/verify', wrap(async (req, res) => {
+apiRouter.post('/entities/:id/verify', requireAuth('DOCTOR', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   const entity = await db.documents.verifyEntity(req.params.id, {
     name: req.body.name,
     value: req.body.value
@@ -284,35 +360,44 @@ apiRouter.post('/entities/:id/verify', wrap(async (req, res) => {
   res.json({ success: true, entity });
 }));
 
-// 9. TIMELINE & ABDM
-apiRouter.get('/timeline/:patientId', wrap(async (req, res) => {
+// 9. TIMELINE & ABDM ----------------------------------------------------------------------
+apiRouter.get('/timeline/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own timeline.' });
+  }
   res.json(await db.timeline.byPatient(req.params.patientId));
 }));
 
-apiRouter.get('/abdm/records/:patientId', wrap(async (req, res) => {
+apiRouter.get('/abdm/records/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own ABDM records.' });
+  }
   res.json(await db.abdm.recordsByPatient(req.params.patientId));
 }));
 
-apiRouter.get('/abdm/fhir/:patientId', wrap(async (req, res) => {
+apiRouter.get('/abdm/fhir/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own FHIR bundle.' });
+  }
   const bundle = await AbdmAdapter.generateFhirPatientBundle(req.params.patientId);
   res.json(bundle);
 }));
 
-// 10. AI STRUCTURED SUMMARY
-apiRouter.get('/ai-summary/:sessionId', wrap(async (req, res) => {
+// 10. AI STRUCTURED SUMMARY -------------------------------------------------------------------
+apiRouter.get('/ai-summary/:sessionId', requireAuth(), wrap(async (req, res) => {
   const summary = await db.summaries.bySession(req.params.sessionId);
   res.json(summary || null);
 }));
 
-apiRouter.post('/ai-summary/generate', wrap(async (req, res) => {
+apiRouter.post('/ai-summary/generate', requireAuth(...ALL), wrap(async (req, res) => {
   const { sessionId, patientId } = req.body;
   const summary = await SummaryEngine.generateSummary(sessionId, patientId);
   res.json(summary);
 }));
 
-apiRouter.post('/ai-summary/:id/verify', wrap(async (req, res) => {
+apiRouter.post('/ai-summary/:id/verify', requireAuth('DOCTOR', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   const summary = await db.summaries.verify(req.params.id, {
-    doctorId: req.body.doctorId,
+    doctorId: req.body.doctorId ?? req.user!.id,
     doctorNotes: req.body.doctorNotes,
     chiefComplaint: req.body.chiefComplaint,
     historyOfPresentIllness: req.body.historyOfPresentIllness
@@ -321,12 +406,12 @@ apiRouter.post('/ai-summary/:id/verify', wrap(async (req, res) => {
   res.json({ success: true, summary });
 }));
 
-// 11. TRIAGE ALERTS
-apiRouter.get('/triage/alerts', wrap(async (_req, res) => {
+// 11. TRIAGE ALERTS ------------------------------------------------------------------------------
+apiRouter.get('/triage/alerts', requireAuth(...STAFF_READ), wrap(async (_req, res) => {
   res.json(await db.alerts.list());
 }));
 
-apiRouter.post('/triage/acknowledge/:id', wrap(async (req, res) => {
+apiRouter.post('/triage/acknowledge/:id', requireAuth('TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   const alert = await db.alerts.acknowledge(req.params.id, {
     acknowledgedBy: req.body.acknowledgedBy,
     actionTaken: req.body.actionTaken
@@ -335,17 +420,17 @@ apiRouter.post('/triage/acknowledge/:id', wrap(async (req, res) => {
   res.json({ success: true, alert });
 }));
 
-// 12. CONSULTATION & PRESCRIPTION
-apiRouter.get('/consultations/:patientId', wrap(async (req, res) => {
+// 12. CONSULTATION & PRESCRIPTION -------------------------------------------------------------------
+apiRouter.get('/consultations/:patientId', requireAuth(...STAFF_READ), wrap(async (req, res) => {
   res.json(await db.consultations.byPatient(req.params.patientId));
 }));
 
-apiRouter.post('/consultations', wrap(async (req, res) => {
+apiRouter.post('/consultations', requireAuth('DOCTOR', 'ADMIN'), wrap(async (req, res) => {
   const consultation = await db.consultations.create(req.body);
   res.json(consultation);
 }));
 
-apiRouter.post('/consultations/:id/finalize', wrap(async (req, res) => {
+apiRouter.post('/consultations/:id/finalize', requireAuth('DOCTOR', 'ADMIN'), wrap(async (req, res) => {
   const existing = (await db.consultations.byPatient(req.body.patientId || ''))
     .find((c) => c.id === req.params.id);
 
@@ -398,29 +483,38 @@ apiRouter.post('/consultations/:id/finalize', wrap(async (req, res) => {
   res.json({ success: true, consultation: finalized });
 }));
 
-// 13. NOTIFICATIONS, AUDIT & SYSTEM HEALTH
-apiRouter.get('/notifications/:patientId', wrap(async (req, res) => {
+// 13. NOTIFICATIONS, AUDIT & SYSTEM HEALTH ------------------------------------------------------------
+apiRouter.get('/notifications/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own notifications.' });
+  }
   res.json(await db.notifications.byPatient(req.params.patientId));
 }));
 
-apiRouter.get('/audit/logs', wrap(async (_req, res) => {
+apiRouter.get('/audit/logs', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
   res.json(await db.auditLogs.list());
 }));
 
-apiRouter.get('/system/health', wrap(async (_req, res) => {
+apiRouter.get('/system/health', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
   res.json(await db.systemHealth.list());
 }));
 
-apiRouter.get('/integrations/events', wrap(async (_req, res) => {
+apiRouter.get('/integrations/events', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
   res.json(await db.integrationEvents.list());
 }));
 
-// 14. DEMO CONTROL CENTER
-apiRouter.post('/demo/reset', wrap(async (_req, res) => {
+// 14. DEMO CONTROL CENTER (authenticated demo utilities — documented exception)
+apiRouter.post('/demo/reset', requireAuth(...ALL), wrap(async (_req, res) => {
   await seedDatabase(true);
   res.json({ success: true, message: 'MediKiosk demo environment reset to pristine initial state.' });
 }));
 
-apiRouter.get('/demo/state', wrap(async (_req, res) => {
+apiRouter.get('/demo/state', requireAuth(...ALL), wrap(async (_req, res) => {
   res.json(await db.snapshot());
 }));
+
+// Centralized error handler — no stack traces leak to clients.
+apiRouter.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[API] Unhandled error:', err);
+  res.status(500).json({ success: false, code: 'INTERNAL_ERROR', message: 'Internal server error.' });
+});

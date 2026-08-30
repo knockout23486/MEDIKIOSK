@@ -12,6 +12,7 @@ import {
   pgTable, varchar, text, integer, boolean, doublePrecision, jsonb, index,
   uniqueIndex, pgSequence, customType
 } from 'drizzle-orm/pg-core';
+import { encryptedText, encryptedJson } from './crypto.js';
 
 // Timestamp-with-time-zone column. SQL stores `timestamptz`; the application
 // layer exchanges ISO-8601 strings (UTC) so the wire format is unchanged.
@@ -69,6 +70,8 @@ export interface User {
 
 export interface Patient {
   id: string;
+  /** Owning portal user (demo kiosk account) — drives record-level access. */
+  userId?: string;
   mkPatientId: string; // e.g. MK-PAT-2026-000124
   abhaNumber: string; // e.g. 91-4829-1029-4821
   abhaAddress: string; // e.g. radha.sharma@abdm
@@ -494,28 +497,33 @@ export const users = pgTable('users', {
 export const patients = pgTable('patients', {
   id: varchar('id', { length: 64 }).primaryKey(),
   mkPatientId: varchar('mk_patient_id', { length: 64 }).notNull().unique(),
-  abhaNumber: varchar('abha_number', { length: 32 }).notNull(),
-  abhaAddress: varchar('abha_address', { length: 128 }).notNull(),
-  name: varchar('name', { length: 256 }).notNull(),
+  // Ownership link to the portal user (kiosk demo account). Used to enforce
+  // record-level access: a PATIENT token may only read its own record.
+  userId: varchar('user_id', { length: 64 }),
+  // Direct identifiers are application-encrypted (AES-256-GCM) before they
+  // reach PostgreSQL — see server/db/crypto.ts (SEC-004).
+  abhaNumber: encryptedText('abha_number').notNull(),
+  abhaAddress: encryptedText('abha_address').notNull(),
+  name: encryptedText('name').notNull(),
   age: integer('age').notNull(),
   dob: dateStr('dob').notNull(),
   gender: varchar('gender', { length: 16 }).$type<Patient['gender']>().notNull(),
-  phone: varchar('phone', { length: 32 }).notNull(),
-  address: text('address').notNull(),
-  emergencyContact: jsonb('emergency_contact').$type<Patient['emergencyContact']>().notNull(),
+  phone: encryptedText('phone').notNull(),
+  address: encryptedText('address').notNull(),
+  emergencyContact: encryptedJson<Patient['emergencyContact']>()('emergency_contact').notNull(),
   language: varchar('language', { length: 16 }).notNull(),
-  accessibilityNeeds: jsonb('accessibility_needs').$type<string[]>(),
+  accessibilityNeeds: encryptedJson<string[]>()('accessibility_needs'),
   isDemo: boolean('is_demo').notNull().default(false),
   registeredAt: tstz('registered_at').notNull()
 }, (table) => [
-  index('patients_abha_idx').on(table.abhaNumber)
+  index('patients_user_idx').on(table.userId)
 ]);
 
 export const consents = pgTable('consents', {
   id: varchar('id', { length: 64 }).primaryKey(),
   patientId: varchar('patient_id', { length: 64 }).notNull().unique(),
   version: varchar('version', { length: 32 }).notNull(),
-  purposes: jsonb('purposes').$type<Consent['purposes']>().notNull(),
+  purposes: encryptedJson<Consent['purposes']>()('purposes').notNull(),
   status: varchar('status', { length: 32 }).$type<Consent['status']>().notNull(),
   grantedAt: tstz('granted_at').notNull(),
   ipAddress: varchar('ip_address', { length: 64 }).notNull(),
@@ -540,7 +548,7 @@ export const departments = pgTable('departments', {
   code: varchar('code', { length: 32 }).notNull(),
   isAyush: boolean('is_ayush').notNull(),
   ayushBranch: varchar('ayush_branch', { length: 32 }).$type<NonNullable<Department['ayushBranch']>>(),
-  description: text('description').notNull(),
+  description: encryptedText('description').notNull(),
   iconName: varchar('icon_name', { length: 64 }).notNull()
 });
 
@@ -612,10 +620,10 @@ export const clinicalAnswers = pgTable('clinical_answers', {
   id: varchar('id', { length: 64 }).primaryKey(),
   sessionId: varchar('session_id', { length: 64 }).notNull(),
   questionId: varchar('question_id', { length: 128 }).notNull(),
-  questionText: text('question_text').notNull(),
-  answerText: text('answer_text').notNull(),
+  questionText: encryptedText('question_text').notNull(),
+  answerText: encryptedText('answer_text').notNull(),
   inputMode: varchar('input_mode', { length: 16 }).$type<ClinicalAnswer['inputMode']>().notNull(),
-  voiceTranscript: text('voice_transcript'),
+  voiceTranscript: encryptedText('voice_transcript'),
   confidence: doublePrecision('confidence').notNull(),
   redFlagFlagged: boolean('red_flag_flagged').notNull().default(false),
   provenance: varchar('provenance', { length: 32 }).$type<ProvenanceSource>().notNull(),
@@ -679,7 +687,7 @@ export const medicalEntities = pgTable('medical_entities', {
   isAbnormal: boolean('is_abnormal'),
   abnormalDirection: varchar('abnormal_direction', { length: 16 }).$type<NonNullable<MedicalEntity['abnormalDirection']>>(),
   confidence: doublePrecision('confidence').notNull(),
-  sourceTextSnippet: text('source_text_snippet').notNull(),
+  sourceTextSnippet: encryptedText('source_text_snippet').notNull(),
   provenance: varchar('provenance', { length: 32 }).$type<ProvenanceSource>().notNull(),
   isVerified: boolean('is_verified').notNull().default(false),
   verifiedByDoctor: varchar('verified_by_doctor', { length: 128 })
@@ -695,7 +703,7 @@ export const timelineEvents = pgTable('timeline_events', {
   title: varchar('title', { length: 256 }).notNull(),
   category: varchar('category', { length: 32 }).$type<TimelineEvent['category']>().notNull(),
   institution: varchar('institution', { length: 256 }).notNull(),
-  description: text('description').notNull(),
+  description: encryptedText('description').notNull(),
   keyEntities: jsonb('key_entities').$type<string[]>().notNull(),
   documentId: varchar('document_id', { length: 64 }),
   provenance: varchar('provenance', { length: 32 }).$type<ProvenanceSource>().notNull()
@@ -707,7 +715,7 @@ export const abdmRecords = pgTable('abdm_records', {
   id: varchar('id', { length: 64 }).primaryKey(),
   patientId: varchar('patient_id', { length: 64 }).notNull(),
   resourceType: varchar('resource_type', { length: 64 }).$type<AbdmRecord['resourceType']>().notNull(),
-  fhirJson: jsonb('fhir_json').$type<Record<string, any>>().notNull(),
+  fhirJson: encryptedJson<Record<string, any>>()('fhir_json').notNull(),
   hipName: varchar('hip_name', { length: 256 }).notNull(),
   hipId: varchar('hip_id', { length: 128 }).notNull(),
   recordDate: dateStr('record_date').notNull(),
@@ -722,7 +730,7 @@ export const aiSummaries = pgTable('ai_summaries', {
   patientId: varchar('patient_id', { length: 64 }).notNull(),
   version: integer('version').notNull().default(1),
   status: varchar('status', { length: 32 }).$type<AiSummary['status']>().notNull(),
-  patientSnapshot: text('patient_snapshot').notNull(),
+  patientSnapshot: encryptedText('patient_snapshot').notNull(),
   chiefComplaint: text('chief_complaint').notNull(),
   historyOfPresentIllness: text('history_of_present_illness').notNull(),
   relevantPastHistory: jsonb('relevant_past_history').$type<string[]>().notNull(),
@@ -751,11 +759,11 @@ export const redFlagAlerts = pgTable('red_flag_alerts', {
   sessionId: varchar('session_id', { length: 64 }).notNull(),
   patientId: varchar('patient_id', { length: 64 }).notNull(),
   tokenNumber: varchar('token_number', { length: 32 }).notNull(),
-  patientName: varchar('patient_name', { length: 256 }).notNull(),
+  patientName: encryptedText('patient_name').notNull(),
   age: integer('age').notNull(),
   gender: varchar('gender', { length: 16 }).notNull(),
   triggerRule: varchar('trigger_rule', { length: 128 }).notNull(),
-  triggerInput: text('trigger_input').notNull(),
+  triggerInput: encryptedText('trigger_input').notNull(),
   severity: varchar('severity', { length: 32 }).$type<RedFlagAlert['severity']>().notNull(),
   detectedAt: tstz('detected_at').notNull(),
   status: varchar('status', { length: 32 }).$type<RedFlagAlert['status']>().notNull(),
@@ -772,7 +780,7 @@ export const consultations = pgTable('consultations', {
   patientId: varchar('patient_id', { length: 64 }).notNull(),
   practitionerId: varchar('practitioner_id', { length: 64 }).notNull(),
   aiSummaryId: varchar('ai_summary_id', { length: 64 }).notNull(),
-  clinicalExamination: jsonb('clinical_examination').$type<Consultation['clinicalExamination']>().notNull(),
+  clinicalExamination: encryptedJson<Consultation['clinicalExamination']>()('clinical_examination').notNull(),
   assessment: text('assessment').notNull(),
   finalDiagnosis: jsonb('final_diagnosis').$type<Consultation['finalDiagnosis']>().notNull(),
   ayushChikitsaSutra: text('ayush_chikitsa_sutra'),
@@ -815,7 +823,7 @@ export const notifications = pgTable('notifications', {
   patientId: varchar('patient_id', { length: 64 }).notNull(),
   channel: varchar('channel', { length: 16 }).$type<NotificationItem['channel']>().notNull(),
   title: varchar('title', { length: 256 }).notNull(),
-  message: text('message').notNull(),
+  message: encryptedText('message').notNull(),
   timestamp: tstz('timestamp').notNull(),
   status: varchar('status', { length: 32 }).$type<NotificationItem['status']>().notNull()
 }, (table) => [

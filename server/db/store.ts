@@ -324,7 +324,7 @@ export const db = {
       );
     },
 
-    async get(idOrMkPatientId: string): Promise<Patient | undefined> {
+    async get(idOrMkPatientId: string): Promise<(Patient & { userId?: string | null }) | undefined> {
       const rows = await orm
         .select()
         .from(t.patients)
@@ -350,7 +350,9 @@ export const db = {
       return runInTransaction(async (tx) => {
         const seq = await nextSeq(tx, 'mk_patient_id_seq');
         // Server-generated identifiers always win over client input.
-        const { id: _id, mkPatientId: _mk, registeredAt: _reg, ...safeInput } = input as any;
+        const {
+          id: _id, mkPatientId: _mk, registeredAt: _reg, userId: _uid, ...safeInput
+        } = input as any;
         const patient: Patient = {
           id: genId('PAT-'),
           mkPatientId: `MK-PAT-2026-${String(seq).padStart(6, '0')}`,
