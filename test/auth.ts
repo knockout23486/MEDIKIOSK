@@ -10,7 +10,15 @@
 //      when fetching another patient's record/notifications/timeline.
 //   5. Login rejects bad credentials with 401 and never leaks passwordHash.
 // ============================================================================
+// Raise the login rate limit for this suite (limiter reads env lazily; the
+// dedicated rate-limit behavior is tested in a child process below).
+process.env.LOGIN_RATE_LIMIT_MAX = process.env.LOGIN_RATE_LIMIT_MAX ?? '1000';
+
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import type { Server } from 'http';
+import { execFileSync } from 'child_process';
 import jwt from 'jsonwebtoken';
 import { createApp } from '../server/index.js';
 import { db } from '../server/db/store.js';
@@ -270,6 +278,172 @@ async function main() {
     'SSE /api/events accepts a valid token via query param (200 event-stream)');
   const sseBad = await fetch(`${base}/api/events`);
   assert(sseBad.status === 401, 'SSE /api/events without a token is rejected (401)');
+
+  // --- 6. IDOR on write operations (SEC-009 / SEC-011) -----------------------
+  console.log('\n6. Write-side IDOR protection (SEC-009/SEC-011):');
+
+  // A session owned by ANOTHER patient (created legitimately by triage staff).
+  const emergSession = await call(base, 'POST', '/api/clinical/session', triageToken, {
+    patientId: 'PAT-EMERG-02', appointmentId: 'APT-002', departmentId: 'DEP-08',
+    isAyush: false, chiefComplaint: 'Chest pain', status: 'IN_PROGRESS'
+  });
+  assert(emergSession.status === 200, 'TRIAGE opens a session for patient PAT-EMERG-02 (staff, 200)');
+
+  // POST /clinical/session for another patient → 403
+  const sessOther = await call(base, 'POST', '/api/clinical/session', patientToken, {
+    patientId: 'PAT-EMERG-02', chiefComplaint: 'x'
+  });
+  assert(sessOther.status === 403, 'PATIENT cannot open a session for another patient (403)');
+  const sessOwn = await call(base, 'POST', '/api/clinical/session', patientToken, {
+    patientId: 'PAT-HERO-01', appointmentId: 'APT-001', departmentId: 'DEP-01',
+    isAyush: true, chiefComplaint: 'Knee pain'
+  });
+  assert(sessOwn.status === 200, 'PATIENT opens a session for their OWN record (200)');
+
+  // POST /clinical/answer — acceptance criterion of SEC-009.
+  const ansOther = await call(base, 'POST', '/api/clinical/answer', patientToken, {
+    sessionId: 'SES-HERO-01', questionId: 'Q1', questionText: 'Pain?', answerText: 'forged chest pain',
+    patientId: 'PAT-EMERG-02'
+  });
+  assert(ansOther.status === 403, 'PATIENT POST /clinical/answer with another patientId → 403 (SEC-009 acceptance)');
+  const ansForeignSession = await call(base, 'POST', '/api/clinical/answer', patientToken, {
+    sessionId: emergSession.body?.id, questionId: 'Q1', questionText: 'Pain?',
+    answerText: 'forged', patientId: 'PAT-HERO-01'
+  });
+  assert(ansForeignSession.status === 403, 'PATIENT cannot append answers to another patient session (403)');
+  const ansOwn = await call(base, 'POST', '/api/clinical/answer', patientToken, {
+    sessionId: sessOwn.body?.id, questionId: 'Q1', questionText: 'Pain?',
+    answerText: 'knee pain worse in cold', patientId: 'PAT-HERO-01'
+  });
+  assert(ansOwn.status === 200, 'PATIENT answers on their OWN session (200)');
+  const staffAns = await call(base, 'POST', '/api/clinical/answer', triageToken, {
+    sessionId: emergSession.body?.id, questionId: 'Q2', questionText: 'Onset?',
+    answerText: '45 minutes', patientId: 'PAT-EMERG-02'
+  });
+  assert(staffAns.status === 200, 'TRIAGE records answers for any patient (staff, 200)');
+
+  // Session/patient mismatch is rejected even for staff (data integrity).
+  const docMismatch = await call(base, 'POST', '/api/clinical/answer', doctorToken, {
+    sessionId: sessOwn.body?.id, questionId: 'Q3', questionText: '?',
+    answerText: 'mismatch', patientId: 'PAT-EMERG-02'
+  });
+  assert(docMismatch.status === 403, 'Session/patientId mismatch rejected even for DOCTOR (403)');
+
+  // POST /clinical/ayush onto another patient's session → 403
+  const ayushOther = await call(base, 'POST', '/api/clinical/ayush', patientToken, {
+    sessionId: emergSession.body?.id, answers: {}
+  });
+  assert(ayushOther.status === 403, 'PATIENT cannot save AYUSH assessments onto another patient session (403)');
+  const ayushOwn = await call(base, 'POST', '/api/clinical/ayush', patientToken, {
+    sessionId: sessOwn.body?.id, answers: {}
+  });
+  assert(ayushOwn.status === 200, 'PATIENT saves AYUSH assessment on own session (200)');
+
+  // POST /documents/process-demo for another patient → 403 (SEC-011)
+  const docOther = await call(base, 'POST', '/api/documents/process-demo', patientToken, {
+    documentId: 'DOC-EVIL', patientId: 'PAT-EMERG-02', fileName: 'evil.pdf', rawText: 'Hb: 3.0'
+  });
+  assert(docOther.status === 403, 'PATIENT cannot process documents into another patient record (403, SEC-011)');
+  const docOwn = await call(base, 'POST', '/api/documents/process-demo', patientToken, {
+    documentId: 'DOC-OWN-1', patientId: 'PAT-HERO-01', fileName: 'own.pdf', rawText: 'Hemoglobin: 10.2 g/dL'
+  });
+  assert(docOwn.status === 200, 'PATIENT processes a document into their OWN record (200)');
+
+  // POST /ai-summary/generate for another patient → 403; GET foreign summary → 403
+  const sumOther = await call(base, 'POST', '/api/ai-summary/generate', patientToken, {
+    sessionId: emergSession.body?.id, patientId: 'PAT-EMERG-02'
+  });
+  assert(sumOther.status === 403, 'PATIENT cannot generate summaries for another patient (403)');
+  const emergSummary = await call(base, 'POST', '/api/ai-summary/generate', triageToken, {
+    sessionId: emergSession.body?.id, patientId: 'PAT-EMERG-02'
+  });
+  assert(emergSummary.status === 200, 'TRIAGE generates a summary for patient PAT-EMERG-02 (staff, 200)');
+  const readForeign = await call(base, 'GET', `/api/ai-summary/${emergSession.body?.id}`, patientToken);
+  assert(readForeign.status === 403, 'PATIENT cannot READ another patient AI summary by sessionId (403)');
+
+  // POST /consents + /appointments for another patient → 403
+  const consentOther = await call(base, 'POST', '/api/consents', patientToken, { patientId: 'PAT-EMERG-02' });
+  assert(consentOther.status === 403, 'PATIENT cannot grant consent for another patient (403)');
+  const apptOther = await call(base, 'POST', '/api/appointments', patientToken, {
+    patientId: 'PAT-EMERG-02', practitionerId: 'PRAC-01', departmentId: 'DEP-01', hospitalId: 'HOSP-01'
+  });
+  assert(apptOther.status === 403, 'PATIENT cannot book appointments for another patient (403)');
+
+  // No forged rows landed: the other patient's answers were never written.
+  const emergAnswers = await db.pool.query(
+    'SELECT COUNT(*)::int AS n FROM clinical_answers WHERE session_id = $1 AND answer_text = $2',
+    [emergSession.body?.id, 'forged chest pain']
+  );
+  assert(emergAnswers.rows[0].n === 0, 'No forged clinical answers persisted for the other patient');
+
+  // --- 7. Demo control-center lockdown (SEC-010) -------------------------------
+  console.log('\n7. Demo reset/state RBAC (SEC-010):');
+  const sysadminToken = await login(base, 'SYSTEM_ADMIN');
+  const resetByPatient = await call(base, 'POST', '/api/demo/reset', patientToken);
+  assert(resetByPatient.status === 403, 'PATIENT cannot wipe the database via /demo/reset (403)');
+  const resetByDoctor = await call(base, 'POST', '/api/demo/reset', doctorToken);
+  assert(resetByDoctor.status === 403, 'DOCTOR cannot wipe the database via /demo/reset (403)');
+  const resetByTriage = await call(base, 'POST', '/api/demo/reset', triageToken);
+  assert(resetByTriage.status === 403, 'TRIAGE cannot wipe the database via /demo/reset (403)');
+  const resetByAdmin = await call(base, 'POST', '/api/demo/reset', adminToken);
+  assert(resetByAdmin.status === 403, 'ADMIN cannot wipe the database via /demo/reset (403)');
+  const resetBySysadmin = await call(base, 'POST', '/api/demo/reset', sysadminToken);
+  assert(resetBySysadmin.status === 200, 'SYSTEM_ADMIN may reset the demo environment (200)');
+
+  const stateByPatient = await call(base, 'GET', '/api/demo/state', patientToken);
+  assert(stateByPatient.status === 403, 'PATIENT cannot exfiltrate the full DB snapshot via /demo/state (403)');
+  const stateByDoctor = await call(base, 'GET', '/api/demo/state', doctorToken);
+  assert(stateByDoctor.status === 403, 'DOCTOR cannot read full DB snapshot via /demo/state (403)');
+  const stateByAdmin = await call(base, 'GET', '/api/demo/state', adminToken);
+  assert(stateByAdmin.status === 200 && Array.isArray(stateByAdmin.body?.patients), 'ADMIN may read the demo snapshot (200)');
+
+  // --- 8. Rate limiting + ephemeral dev secret (SEC-012 / SEC-013) --------------
+  console.log('\n8. Login rate limiting & dev-secret ephemerality:');
+  let rateLimited = false;
+  let statuses: number[] = [];
+  try {
+    const out = execFileSync('npx', ['tsx', '-e', `
+      import('./server/index.js').then(async (mod) => {
+        const app = mod.createApp();
+        const server = await new Promise<any>((resolve) => {
+          const s = app.listen(0, '127.0.0.1', () => resolve(s));
+        });
+        const base = 'http://127.0.0.1:' + server.address().port;
+        const statuses: number[] = [];
+        for (let i = 0; i < 5; i++) {
+          const r = await fetch(base + '/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: 'doctor', password: 'wrong-' + i })
+          });
+          statuses.push(r.status);
+        }
+        server.close();
+        console.log('RL_STATUSES:' + JSON.stringify(statuses));
+        process.exit(0);
+      }).catch(e => { console.error(e); process.exit(1); });
+    `], { cwd: process.cwd(), stdio: 'pipe', timeout: 90_000, env: { ...process.env, LOGIN_RATE_LIMIT_MAX: '3', LOGIN_RATE_LIMIT_WINDOW_MS: '60000' } }).toString();
+    statuses = JSON.parse((out.match(/RL_STATUSES:(\[[^\]]+\])/) ?? ['','[]'])[1]);
+  } catch { statuses = []; }
+  rateLimited = statuses.length === 5 && statuses.slice(0, 3).every(c => c === 401) && statuses.slice(3).every(c => c === 429);
+  assert(rateLimited, `Login rate limiter engages: first attempts 401, then 429 (got ${JSON.stringify(statuses)})`);
+
+  // SEC-013: dev fallback secrets must be RANDOM PER PROCESS — a token signed
+  // by one process must fail verification in another.
+  let ephemeralOk = false;
+  try {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'mk-jwt-'));
+    const modPath = path.resolve(process.cwd(), 'server/middleware/auth.js');
+    const tok = execFileSync('npx', ['tsx', '-e',
+      `delete process.env.AUTH_JWT_SECRET; process.chdir(${JSON.stringify(scratch)}); import(${JSON.stringify(modPath)}).then(m => { console.log('T:' + m.signToken({ id: 'u', username: 'x', role: 'PATIENT', name: 'x' })); })`],
+      { cwd: process.cwd(), stdio: 'pipe', timeout: 60_000 }).toString().trim();
+    const token = tok.split('\n').pop()?.slice(2) ?? '';
+    const verdict = execFileSync('npx', ['tsx', '-e',
+      `delete process.env.AUTH_JWT_SECRET; process.chdir(${JSON.stringify(scratch)}); import(${JSON.stringify(modPath)}).then(m => { console.log('V:' + (m.verifyToken(${JSON.stringify(token)}) === null)); })`],
+      { cwd: process.cwd(), stdio: 'pipe', timeout: 60_000 }).toString();
+    ephemeralOk = verdict.includes('V:true');
+  } catch { ephemeralOk = false; }
+  assert(ephemeralOk, 'Dev JWT fallback is RANDOM EPHEMERAL per process (cross-process token rejected)');
 
   console.log('\n================================================================');
   console.log(`Results: ${passed} Passed, ${failed} Failed`);

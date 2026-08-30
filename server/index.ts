@@ -19,8 +19,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '10mb' })); // bounded payload size (DoS surface)
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Health Endpoint (includes live PostgreSQL connectivity probe)
 app.get('/health', async (_req, res) => {

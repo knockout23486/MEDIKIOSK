@@ -14,6 +14,7 @@
 //            (denials are written to the PostgreSQL audit trail).
 // ============================================================================
 import 'dotenv/config';
+import { randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
 import { db } from '../db/store.js';
@@ -45,11 +46,15 @@ function loadJwtSecret(): string {
       'FATAL: AUTH_JWT_SECRET must be set to 32+ random characters in production. Refusing to start.'
     );
   }
+  // SEC-013: never fall back to a constant, guessable secret. Development
+  // boots get a RANDOM EPHEMERAL secret per process — unguessable even if
+  // NODE_ENV is misconfigured as 'development' in a real deployment. Tokens
+  // simply become invalid when the process restarts.
   console.warn(
-    '[Auth] AUTH_JWT_SECRET not set (or too short) — using derived development secret. Do NOT use in production.'
+    '[Auth] AUTH_JWT_SECRET not set (or too short) — generated RANDOM EPHEMERAL secret ' +
+    '(tokens invalidate on restart; never use in production).'
   );
-  // Deterministic dev fallback keeps tokens valid across dev-server restarts.
-  return 'medikiosk-dev-jwt-secret:' + '0'.repeat(32);
+  return randomBytes(48).toString('base64url');
 }
 
 // Resolved lazily (memoized) so dotenv has loaded .env before first use.

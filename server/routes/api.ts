@@ -1,5 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
+import rateLimit from 'express-rate-limit';
 import { db, genId } from '../db/store.js';
 import { ClinicalAIService } from '../services/clinicalEngine.js';
 import { RedFlagEngine } from '../services/redFlagEngine.js';
@@ -45,6 +46,62 @@ async function patientReadableByCaller(patientId: string, user: { id: string; ro
   return !!patient && patient.userId === user.id;
 }
 
+function forbidden(res: Response, message: string) {
+  return res.status(403).json({ success: false, code: 'FORBIDDEN', message });
+}
+
+/**
+ * Write-side ownership guard (SEC-009/SEC-011): when a PATIENT-role caller
+ * references a patientId in a write payload, that id must resolve to the
+ * patient record owned by the JWT subject. Staff roles are authorized by
+ * their route RBAC allow-list and pass through.
+ */
+async function patientWritableByCaller(
+  patientId: unknown,
+  user: { id: string; role: UserRole }
+): Promise<boolean> {
+  if (typeof patientId !== 'string' || patientId.length === 0) return true; // staff-only flows
+  if (user.role !== 'PATIENT') return true;
+  return patientReadableByCaller(patientId, user);
+}
+
+/**
+ * Session-integrity guard: a clinical session id referenced in a payload must
+ * belong to the claimed patientId (enforced for EVERY role — this is data
+ * integrity, not just authorization). Returns null when the session is
+ * unknown (legacy demo flows may reference not-yet-persisted sessions).
+ */
+async function sessionPatientId(sessionId: unknown): Promise<string | null | undefined> {
+  if (typeof sessionId !== 'string' || sessionId.length === 0) return undefined;
+  const session = await db.clinical.getSession(sessionId);
+  return session ? session.patientId : null;
+}
+
+// Login rate limiter (SEC-012) — created lazily so environment overrides are
+// honored, and keyed per IP + username. Default: 10 attempts / 15 minutes.
+let loginLimiter: ReturnType<typeof rateLimit> | null = null;
+function getLoginLimiter() {
+  if (!loginLimiter) {
+    loginLimiter = rateLimit({
+      windowMs: Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
+      limit: Number(process.env.LOGIN_RATE_LIMIT_MAX ?? 10),
+      standardHeaders: true,
+      legacyHeaders: false,
+      keyGenerator: (req: Request) =>
+        `${req.ip}:${typeof req.body?.username === 'string' ? req.body.username.slice(0, 64) : ''}`,
+      handler: (_req: Request, res: Response) => {
+        console.warn('[Auth] Rate limit: too many login attempts.');
+        res.status(429).json({
+          success: false,
+          code: 'RATE_LIMITED',
+          message: 'Too many login attempts. Please try again later.'
+        });
+      }
+    });
+  }
+  return loginLimiter;
+}
+
 // 1. REAL-TIME SERVER-SENT EVENTS (SSE) — authenticated (token via query param,
 //    because EventSource cannot set HTTP headers).
 apiRouter.get('/events', requireAuth(), (req, res) => {
@@ -72,7 +129,7 @@ apiRouter.get('/events', requireAuth(), (req, res) => {
 // PUBLIC ROUTE — the single entry point of the security boundary. EVERY login
 // (demo roles included) must present a valid username + password; the bcrypt
 // hash comparison is mandatory (SEC-006/SEC-007). No passwordless path exists.
-apiRouter.post('/auth/login', wrap(async (req, res) => {
+apiRouter.post('/auth/login', (req, res, next) => getLoginLimiter()(req, res, next), wrap(async (req, res) => {
   const { username, password } = req.body;
 
   // Strict shape check: both credentials are always required.
@@ -174,6 +231,10 @@ apiRouter.get('/consents/:patientId', requireAuth(), wrap(async (req, res) => {
 }));
 
 apiRouter.post('/consents', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
+  // SEC-009: a PATIENT token may only grant consent for its OWN record.
+  if (!(await patientWritableByCaller(req.body?.patientId, req.user!))) {
+    return forbidden(res, 'Patients may only grant consent for their own record.');
+  }
   // Atomic upsert on patient_id + audit entry in one transaction.
   const newConsent = await db.consents.grant(req.body, { ipAddress: req.ip });
   res.json(newConsent);
@@ -205,6 +266,10 @@ apiRouter.get('/appointments', requireAuth(...STAFF_READ), wrap(async (_req, res
 }));
 
 apiRouter.post('/appointments', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
+  // SEC-009: a PATIENT token may only book for its OWN record.
+  if (!(await patientWritableByCaller(req.body?.patientId, req.user!))) {
+    return forbidden(res, 'Patients may only book appointments for themselves.');
+  }
   // Atomic: appointment + queue token + SMS notification + audit log.
   const { appointment, token } = await db.appointments.book(req.body, { ipAddress: req.ip });
   res.json({ appointment, token });
@@ -216,8 +281,16 @@ apiRouter.get('/queue/tokens', requireAuth(...STAFF_READ), wrap(async (_req, res
 
 apiRouter.post('/queue/checkin', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   const { tokenNumber, patientId } = req.body;
+  // SEC-009: a PATIENT token may only check in tokens for its OWN record.
+  if (!(await patientWritableByCaller(patientId, req.user!))) {
+    return forbidden(res, 'Patients may only check in their own tokens.');
+  }
   const token = await db.queue.checkIn(tokenNumber, patientId);
   if (!token) return res.status(404).json({ message: 'Token not found' });
+  if (req.user!.role === 'PATIENT' && token.patientId !== patientId &&
+      !(await patientReadableByCaller(token.patientId, req.user!))) {
+    return forbidden(res, 'Patients may only check in their own tokens.');
+  }
   res.json({ success: true, token });
 }));
 
@@ -235,12 +308,30 @@ apiRouter.post('/clinical/questions', requireAuth(...ALL), (req, res) => {
 });
 
 apiRouter.post('/clinical/session', requireAuth(...ALL), wrap(async (req, res) => {
+  // SEC-009: a PATIENT token may only open a session for its OWN record.
+  if (!(await patientWritableByCaller(req.body?.patientId, req.user!))) {
+    return forbidden(res, 'Patients may only start clinical sessions for themselves.');
+  }
   const session = await db.clinical.createSession(req.body);
   res.json(session);
 }));
 
 apiRouter.post('/clinical/answer', requireAuth(...ALL), wrap(async (req, res) => {
   const { sessionId, questionId, questionText, answerText, inputMode, voiceTranscript, patientId } = req.body;
+
+  // SEC-009: a PATIENT token may only write answers against its OWN patientId.
+  if (!(await patientWritableByCaller(patientId, req.user!))) {
+    return forbidden(res, 'Patients may only submit answers for their own record.');
+  }
+
+  // Session integrity (every role): a known sessionId must belong to the
+  // claimed patientId — otherwise anyone could append answers to anyone
+  // else's clinical intake.
+  const sessionOwner = await sessionPatientId(sessionId);
+  if (sessionOwner !== null && sessionOwner !== undefined && sessionOwner !== patientId) {
+    return forbidden(res, 'Clinical session does not belong to the claimed patient.');
+  }
+
   const patient = patientId ? await db.patients.get(patientId) : undefined;
 
   const answer = {
@@ -281,6 +372,15 @@ apiRouter.post('/clinical/answer', requireAuth(...ALL), wrap(async (req, res) =>
 
 apiRouter.post('/clinical/ayush', requireAuth(...ALL), wrap(async (req, res) => {
   const { sessionId, answers } = req.body;
+
+  // SEC-009: a PATIENT token may only save assessments onto its OWN session.
+  const sessionOwner = await sessionPatientId(sessionId);
+  if (req.user!.role === 'PATIENT') {
+    if (!sessionOwner || !(await patientReadableByCaller(sessionOwner, req.user!))) {
+      return forbidden(res, 'Patients may only save assessments for their own sessions.');
+    }
+  }
+
   const prakritiCalc = ClinicalAIService.calculatePrakriti(answers || {});
 
   const assessment = {
@@ -328,6 +428,11 @@ apiRouter.get('/documents/:patientId', requireAuth(), wrap(async (req, res) => {
 
 apiRouter.post('/documents/process-demo', requireAuth(...ALL), wrap(async (req, res) => {
   const { documentId, patientId, fileName, rawText } = req.body;
+
+  // SEC-011: a PATIENT token may only process documents into its OWN record.
+  if (!(await patientWritableByCaller(patientId, req.user!))) {
+    return forbidden(res, 'Patients may only process documents for their own record.');
+  }
 
   const pipelineResult = await OcrEngine.processDocument(documentId, patientId, fileName, rawText);
 
@@ -388,11 +493,27 @@ apiRouter.get('/abdm/fhir/:patientId', requireAuth(), wrap(async (req, res) => {
 // 10. AI STRUCTURED SUMMARY -------------------------------------------------------------------
 apiRouter.get('/ai-summary/:sessionId', requireAuth(), wrap(async (req, res) => {
   const summary = await db.summaries.bySession(req.params.sessionId);
+  // IDOR: a PATIENT token may only read summaries for its OWN sessions.
+  if (summary && req.user!.role === 'PATIENT' &&
+      !(await patientReadableByCaller(summary.patientId, req.user!))) {
+    return forbidden(res, 'Patients may only access their own summaries.');
+  }
   res.json(summary || null);
 }));
 
 apiRouter.post('/ai-summary/generate', requireAuth(...ALL), wrap(async (req, res) => {
   const { sessionId, patientId } = req.body;
+
+  // SEC-009: a PATIENT token may only generate summaries for its OWN record,
+  // and a known session must belong to the claimed patient (all roles).
+  if (!(await patientWritableByCaller(patientId, req.user!))) {
+    return forbidden(res, 'Patients may only generate summaries for their own record.');
+  }
+  const sessionOwner = await sessionPatientId(sessionId);
+  if (sessionOwner !== null && sessionOwner !== undefined && sessionOwner !== patientId) {
+    return forbidden(res, 'Clinical session does not belong to the claimed patient.');
+  }
+
   const summary = await SummaryEngine.generateSummary(sessionId, patientId);
   res.json(summary);
 }));
@@ -505,13 +626,20 @@ apiRouter.get('/integrations/events', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap
   res.json(await db.integrationEvents.list());
 }));
 
-// 14. DEMO CONTROL CENTER (authenticated demo utilities — documented exception)
-apiRouter.post('/demo/reset', requireAuth(...ALL), wrap(async (_req, res) => {
+// 14. DEMO CONTROL CENTER (SEC-010: SYSTEM_ADMIN-only, and fully disabled in
+//     production unless explicitly re-enabled via ENABLE_DEMO_RESET=true).
+//     Rationale: this route TRUNCATEs every clinical table — exposing it to
+//     lower-privileged roles was a one-request hospital-wide data wipe.
+apiRouter.post('/demo/reset', requireAuth('SYSTEM_ADMIN'), wrap(async (_req, res) => {
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_DEMO_RESET !== 'true') {
+    return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'Demo reset is disabled in production.' });
+  }
   await seedDatabase(true);
   res.json({ success: true, message: 'MediKiosk demo environment reset to pristine initial state.' });
 }));
 
-apiRouter.get('/demo/state', requireAuth(...ALL), wrap(async (_req, res) => {
+// Full-database snapshot (all patients' PHI) — admin-only surface.
+apiRouter.get('/demo/state', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
   const state = await db.snapshot();
   // Never expose credential hashes, even to admins (not needed here).
   res.json({ ...state, users: state.users.map(({ passwordHash: _ph, ...u }) => u) });
