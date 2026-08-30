@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useDemo } from '../../contexts/DemoContext.js';
+import { useAuth } from '../../contexts/AuthContext.js';
 import { api } from '../../services/api.js';
 import {
   Pill, Plus, Trash2, CheckCircle2, ArrowRight,
@@ -16,6 +17,7 @@ export const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
   onBack
 }) => {
   const { activePatientId, activeAppointmentId, activeSessionId } = useDemo();
+  const { practitionerId } = useAuth();
 
   const [vitals, setVitals] = useState({
     bp: '126/82 mmHg',
@@ -103,16 +105,20 @@ export const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
   };
 
   const handleRemoveMedicine = (idx: number) => {
-    setMedicines(medicines.filter((_, i) => i !== idx));
+    setMedicines((medicines ?? []).filter((_, i) => i !== idx));
   };
 
   const handleFinalize = async () => {
+    if (!practitionerId) {
+      console.error('Cannot finalize consultation without a verified practitioner identity.');
+      return;
+    }
     setIsFinalizing(true);
     try {
       const payload = {
         appointmentId: activeAppointmentId,
         patientId: activePatientId,
-        practitionerId: 'PRAC-01',
+        practitionerId,
         aiSummaryId: 'SUM-HERO-01',
         clinicalExamination: {
           generalAppearance: 'Conscious, oriented, ambulatory with mild antalgic gait',
@@ -220,7 +226,7 @@ export const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
             2. Final Clinical & AYUSH Diagnosis
           </h3>
           <div className="space-y-2">
-            {diagnoses.map((d, i) => (
+            {(diagnoses ?? []).map((d, i) => (
               <div key={i} className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className="font-mono bg-ayush-100 dark:bg-ayush-950 text-ayush-800 dark:text-ayush-300 font-bold px-2 py-0.5 rounded border border-ayush-300">
@@ -239,7 +245,7 @@ export const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-2">
               <Pill className="w-4 h-4 text-emerald-600" />
-              3. Prescriptions & ChikitsaSutra ({medicines.length})
+              3. Prescriptions & ChikitsaSutra ({(medicines ?? []).length})
             </h3>
             <button
               onClick={handleAddMedicine}
@@ -250,7 +256,7 @@ export const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
           </div>
 
           <div className="space-y-3">
-            {medicines.map((m, idx) => (
+            {(medicines ?? []).map((m, idx) => (
               <div
                 key={idx}
                 className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
@@ -286,7 +292,7 @@ export const PrescriptionBuilder: React.FC<PrescriptionBuilderProps> = ({
         {/* Finalize Button */}
         <button
           onClick={handleFinalize}
-          disabled={isFinalizing}
+          disabled={isFinalizing || !practitionerId}
           className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl text-base shadow-lg transition flex items-center justify-center gap-2"
         >
           {isFinalizing ? (

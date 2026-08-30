@@ -284,7 +284,7 @@ export const DemoControlCenter: React.FC = () => {
             12-Act Presentation Walkthrough Script (Click to Jump)
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {acts.map(act => (
+            {(acts ?? []).map(act => (
               <div
                 key={act.num}
                 onClick={act.action}

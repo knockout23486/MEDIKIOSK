@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDemo } from '../../contexts/DemoContext.js';
+import { useAuth } from '../../contexts/AuthContext.js';
 import { api } from '../../services/api.js';
 import { ProvenanceBadge } from '../common/ProvenanceBadge.js';
 import { ConfidenceBadge } from '../common/ConfidenceBadge.js';
@@ -18,6 +19,7 @@ export const PatientConsultationView: React.FC<PatientConsultationViewProps> = (
   onProceedToPrescription
 }) => {
   const { activePatientId, activeSessionId } = useDemo();
+  const { user } = useAuth();
 
   const [patient, setPatient] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
@@ -43,7 +45,7 @@ export const PatientConsultationView: React.FC<PatientConsultationViewProps> = (
     setIsSaving(true);
     try {
       const res = await api.verifyAiSummary(summary.id, {
-        doctorId: 'USR-DOC-01',
+        doctorId: user.id,
         historyOfPresentIllness: editedHpi,
         doctorNotes: 'History and joint stiffness verified in person with patient Radha Sharma.'
       });
@@ -140,7 +142,7 @@ export const PatientConsultationView: React.FC<PatientConsultationViewProps> = (
           }`}
         >
           <Clock className="w-4 h-4" />
-          Medical Timeline ({timeline.length})
+          Medical Timeline ({(timeline ?? []).length})
         </button>
 
         <button
@@ -232,7 +234,7 @@ export const PatientConsultationView: React.FC<PatientConsultationViewProps> = (
                 Medication History
               </span>
               <div className="space-y-1.5">
-                {summary.medicationHistory.map((m: any, i: number) => (
+                {(summary?.medicationHistory ?? []).map((m: any, i: number) => (
                   <div key={i} className="text-blue-950 dark:text-blue-200 flex items-center justify-between">
                     <span className="font-semibold">{m.name} {m.dose}</span>
                     <span className="text-[10px] text-blue-600 opacity-80 font-mono">({m.freq})</span>
@@ -246,7 +248,7 @@ export const PatientConsultationView: React.FC<PatientConsultationViewProps> = (
               <span className="font-bold text-rose-900 dark:text-rose-300 block mb-2 uppercase tracking-wider">
                 Allergies
               </span>
-              {summary.allergies.map((al: any, i: number) => (
+              {(summary?.allergies ?? []).map((al: any, i: number) => (
                 <div key={i} className="text-rose-950 dark:text-rose-200 font-semibold">
                   • {al.allergen} ({al.severity}): {al.reaction}
                 </div>
@@ -258,7 +260,7 @@ export const PatientConsultationView: React.FC<PatientConsultationViewProps> = (
               <span className="font-bold text-slate-700 dark:text-slate-300 block mb-2 uppercase tracking-wider">
                 Past Medical History
               </span>
-              {summary.relevantPastHistory.map((pm: string, i: number) => (
+              {(summary?.relevantPastHistory ?? []).map((pm: string, i: number) => (
                 <div key={i} className="text-slate-700 dark:text-slate-300 font-medium">
                   • {pm}
                 </div>
@@ -299,7 +301,7 @@ export const PatientConsultationView: React.FC<PatientConsultationViewProps> = (
           </h3>
 
           <div className="relative pl-6 border-l-2 border-ayush-400 space-y-6">
-            {timeline.map((event, idx) => (
+            {(timeline ?? []).map((event, idx) => (
               <div key={event.id} className="relative">
                 <div className="absolute -left-[31px] top-0 w-4 h-4 rounded-full bg-ayush-600 border-2 border-white" />
                 <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
@@ -314,7 +316,7 @@ export const PatientConsultationView: React.FC<PatientConsultationViewProps> = (
                     {event.description}
                   </p>
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    {event.keyEntities.map((k: string, i: number) => (
+                    {(event?.keyEntities ?? []).map((k: string, i: number) => (
                       <span key={i} className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-2 py-0.5 rounded font-mono font-medium">
                         {k}
                       </span>

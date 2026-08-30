@@ -62,7 +62,7 @@ export const DepartmentSelect: React.FC<DepartmentSelectProps> = ({ onSelect, on
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {departments.map(dept => {
+        {(departments ?? []).map(dept => {
           const isSelected = selectedDepartmentId === dept.id;
           return (
             <div

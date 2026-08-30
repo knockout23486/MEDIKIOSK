@@ -69,7 +69,7 @@ export const OcrPipelineView: React.FC<OcrPipelineViewProps> = ({ onContinue, on
   };
 
   const handleSaveEdit = (id: string) => {
-    setEntities(prev => prev.map(e => (e.id === id ? { ...e, value: editValue } : e)));
+    setEntities(prev => (prev ?? []).map(e => (e.id === id ? { ...e, value: editValue } : e)));
     setEditingId(null);
   };
 
@@ -139,7 +139,7 @@ export const OcrPipelineView: React.FC<OcrPipelineViewProps> = ({ onContinue, on
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">
-                  Extracted Medical Entities ({entities.length})
+                  Extracted Medical Entities ({(entities ?? []).length})
                 </h3>
                 <p className="text-xs text-slate-500">
                   Click 'Edit' if any OCR number needs human correction.
@@ -148,7 +148,7 @@ export const OcrPipelineView: React.FC<OcrPipelineViewProps> = ({ onContinue, on
             </div>
 
             <div className="space-y-3">
-              {entities.map(ent => (
+              {(entities ?? []).map(ent => (
                 <div
                   key={ent.id}
                   className={`p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between ${

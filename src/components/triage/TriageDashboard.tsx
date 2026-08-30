@@ -56,7 +56,7 @@ export const TriageDashboard: React.FC = () => {
           <div className="bg-red-950/80 border border-red-700/60 rounded-2xl p-3 text-center min-w-[100px]">
             <span className="text-[10px] text-red-300 font-bold uppercase block">Pending Alerts</span>
             <span className="text-3xl font-extrabold text-white">
-              {alerts.filter(a => a.status === 'PENDING').length}
+              {(alerts ?? []).filter(a => a.status === 'PENDING').length}
             </span>
           </div>
         </div>
@@ -71,7 +71,7 @@ export const TriageDashboard: React.FC = () => {
             <span className="text-xs text-slate-400 font-mono">Live Poll Active</span>
           </h3>
 
-          {alerts.map(alert => {
+          {(alerts ?? []).map(alert => {
             const isPending = alert.status === 'PENDING';
             const isSelected = selectedAlert?.id === alert.id;
             return (

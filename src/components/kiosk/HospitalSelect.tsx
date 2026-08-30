@@ -44,7 +44,7 @@ export const HospitalSelect: React.FC<HospitalSelectProps> = ({ onSelect, onBack
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {hospitals.map(hosp => {
+        {(hospitals ?? []).map(hosp => {
           const isSelected = selectedHospitalId === hosp.id;
           return (
             <div

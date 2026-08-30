@@ -99,7 +99,7 @@ export const SlotBooking: React.FC<SlotBookingProps> = ({ onSlotBooked, onBack }
 
         {/* Time Slots Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          {slots.map(slot => {
+          {(slots ?? []).map(slot => {
             const isSelected = selectedSlot === slot.time;
             const isFull = slot.status === 'FULL';
             return (

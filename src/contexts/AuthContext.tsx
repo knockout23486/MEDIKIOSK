@@ -18,6 +18,8 @@ interface AuthContextType {
   user: User;
   role: UserRole;
   isAuthenticated: boolean;
+  /** Practitioner record verified from the API for the authenticated user. */
+  practitionerId: string | null;
   setRole: (role: UserRole) => void;
   switchUser: (role: UserRole) => void;
   logout: () => Promise<void>;
@@ -83,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRoleState] = useState<UserRole>('PATIENT');
   const [user, setUser] = useState<User>(DEFAULT_USERS.PATIENT);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!getAuthToken());
+  const [practitionerId, setPractitionerId] = useState<string | null>(null);
 
   /**
    * Authenticates against the API with the demo account credentials for the
@@ -100,11 +103,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
     setRoleState('PATIENT');
     setUser(DEFAULT_USERS.PATIENT);
+    setPractitionerId(null);
   };
 
   const switchUser = async (newRole: UserRole) => {
     setRoleState(newRole);
     setUser(DEFAULT_USERS[newRole] || DEFAULT_USERS.PATIENT);
+    setPractitionerId(null);
     try {
       // Revoke the outgoing session before issuing the next one (SEC-017).
       if (getAuthToken()) await api.logout();
@@ -112,8 +117,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await api.login(creds.username, creds.password);
       if (res?.success && res?.token) {
         setAuthToken(res.token);
-        if (res.user) setUser(res.user as unknown as User);
+        const verifiedUser = (res.user ?? DEFAULT_USERS[newRole]) as User;
+        setUser(verifiedUser);
         setIsAuthenticated(true);
+
+        if (verifiedUser.role === 'DOCTOR') {
+          const practitioners = await api.getDoctors();
+          const verifiedPractitioner = (practitioners ?? []).find(
+            practitioner => practitioner.userId === verifiedUser.id
+          );
+          setPractitionerId(verifiedPractitioner?.id ?? null);
+        }
       }
     } catch (e) {
       console.warn('[Auth] API login failed — continuing in offline demo mode.', e);
@@ -127,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, role, isAuthenticated, setRole: switchUser, switchUser, logout }}>
+    <AuthContext.Provider value={{ user, role, isAuthenticated, practitionerId, setRole: switchUser, switchUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

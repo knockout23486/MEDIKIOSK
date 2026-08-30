@@ -33,9 +33,10 @@ export const AdaptiveHistory: React.FC<AdaptiveHistoryProps> = ({
   // Initialize questions
   useEffect(() => {
     api.getQuestions('bilateral knee pain and joint stiffness', isAyushMode).then(qs => {
-      setQuestions(qs);
-      if (qs.length > 0) {
-        const q = qs[0];
+      const safeQuestions = Array.isArray(qs) ? qs : [];
+      setQuestions(safeQuestions);
+      if (safeQuestions.length > 0) {
+        const q = safeQuestions[0];
         speak(language === 'hi' ? q.questionHi : q.questionEn);
       }
     });
@@ -219,7 +220,7 @@ export const AdaptiveHistory: React.FC<AdaptiveHistoryProps> = ({
         {/* MODE 2: TOUCH SELECTABLE OPTIONS */}
         {activeInputMode === 'TOUCH' && (
           <div className="space-y-3">
-            {currentQ.options?.map((opt: any) => (
+            {(currentQ?.options ?? []).map((opt: any) => (
               <button
                 key={opt.value}
                 onClick={() => handleAnswerSubmit(language === 'hi' ? opt.labelHi : opt.labelEn, 'TOUCH')}

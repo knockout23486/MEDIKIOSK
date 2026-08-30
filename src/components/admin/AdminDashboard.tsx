@@ -71,7 +71,7 @@ export const AdminDashboard: React.FC = () => {
             activeTab === 'queue' ? 'border-ayush-600 text-ayush-700 bg-ayush-50/50' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Users className="w-4 h-4" /> Live OPD Queue Manager ({tokens.length})
+          <Users className="w-4 h-4" /> Live OPD Queue Manager ({(tokens ?? []).length})
         </button>
         <button
           onClick={() => setActiveTab('health')}
@@ -95,7 +95,7 @@ export const AdminDashboard: React.FC = () => {
             activeTab === 'audit' ? 'border-ayush-600 text-ayush-700 bg-ayush-50/50' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <ShieldCheck className="w-4 h-4" /> DPDP Audit Trail ({auditLogs.length})
+          <ShieldCheck className="w-4 h-4" /> DPDP Audit Trail ({(auditLogs ?? []).length})
         </button>
       </div>
 
@@ -123,7 +123,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {tokens.map(t => (
+            {(tokens ?? []).map(t => (
               <div
                 key={t.id}
                 className={`p-4 rounded-2xl border-2 flex items-center justify-between text-xs transition ${
@@ -172,7 +172,7 @@ export const AdminDashboard: React.FC = () => {
             Microservice Operational & Latency Status
           </h3>
           <div className="space-y-3">
-            {healthStatus.map((s, idx) => (
+            {(healthStatus ?? []).map((s, idx) => (
               <div key={idx} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs">
                 <div>
                   <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
@@ -205,7 +205,7 @@ export const AdminDashboard: React.FC = () => {
             ABDM & HIS Interoperability Telemetry
           </h3>
           <div className="space-y-3">
-            {integrationEvents.map(evt => (
+            {(integrationEvents ?? []).map(evt => (
               <div key={evt.id} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -245,7 +245,7 @@ export const AdminDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {auditLogs.map(log => (
+                {(auditLogs ?? []).map(log => (
                   <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
                     <td className="py-2.5 font-mono text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</td>
                     <td className="py-2.5 font-bold text-slate-900 dark:text-white">{log.actorRole}</td>
