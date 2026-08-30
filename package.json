@@ -18,7 +18,8 @@
     "reset-demo": "tsx server/db/seed.ts --reset",
     "test": "tsx test/run-tests.ts",
     "test:concurrency": "tsx test/concurrency.ts",
-    "test:auth": "tsx test/auth.ts"
+    "test:auth": "LOGIN_RATE_LIMIT_MAX=1000 tsx test/auth.ts",
+    "test:alerts": "tsx test/emergency-alerts.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

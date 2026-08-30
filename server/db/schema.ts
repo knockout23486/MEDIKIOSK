@@ -477,6 +477,8 @@ export interface SystemHealthStatus {
 export const mkPatientIdSeq = pgSequence('mk_patient_id_seq');
 export const appointmentNumberSeq = pgSequence('appointment_number_seq');
 export const queueTokenNumberSeq = pgSequence('queue_token_number_seq');
+/** Emergency (red-flag) triage tokens — EMERG-####, sequence-allocated. */
+export const emergTokenSeq = pgSequence('emerg_token_seq');
 
 // ---------------------------------------------------------------------------
 // POSTGRESQL TABLES

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { db } from '../db/store.js';
 
 export interface HisEncounterSyncPayload {
@@ -17,7 +18,7 @@ export class HisAdapter {
     syncedAt: string;
   }> {
     const startTime = Date.now();
-    const hisEncounterRef = 'AIIA-HIS-ENC-' + Math.floor(100000 + Math.random() * 900000);
+    const hisEncounterRef = 'AIIA-HIS-ENC-' + randomUUID().slice(0, 8).toUpperCase();
 
     const fhirEncounter = {
       resourceType: 'Encounter',

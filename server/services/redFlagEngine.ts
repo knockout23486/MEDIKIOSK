@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { db } from '../db/store.js';
 import { RedFlagAlert } from '../db/schema.js';
 
@@ -64,7 +65,10 @@ export class RedFlagEngine {
     structuredAnswers: Record<string, string>,
     patientInfo: { id: string; name: string; age: number; gender: string; tokenNumber?: string; sessionId: string }
   ): Promise<RedFlagAlert | null> {
-    const textLower = (input + ' ' + Object.values(structuredAnswers).join(' ')).toLowerCase();
+    // SEC-016: normalize whitespace + case uniformly for ALL languages before
+    // matching (previously Hindi keywords were matched against the raw input).
+    const normalized = input.replace(/\s+/g, ' ').trim();
+    const textLower = (normalized + ' ' + Object.values(structuredAnswers).join(' ')).toLowerCase();
 
     for (const rule of RED_FLAG_RULES) {
       let isTriggered = false;
@@ -83,11 +87,12 @@ export class RedFlagEngine {
       // 2. Check keyword clusters
       if (!isTriggered) {
         let count = 0;
+        // SEC-016: identical case-normalized matching for both languages.
         for (const kw of rule.keywordsEn) {
           if (textLower.includes(kw.toLowerCase())) count++;
         }
         for (const kw of rule.keywordsHi) {
-          if (input.includes(kw)) count++;
+          if (textLower.includes(kw.toLowerCase())) count++;
         }
         if (count >= 2) {
           isTriggered = true;
@@ -95,11 +100,16 @@ export class RedFlagEngine {
       }
 
       if (isTriggered) {
-        const alert: RedFlagAlert = {
-          id: 'RFA-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+        // SEC-015: cryptographically random primary key (crypto.randomUUID).
+        // SEC-014: NO in-memory token generation — when the caller has no
+        // token, db.alerts.raise() allocates EMERG-#### from a PostgreSQL
+        // sequence inside the same ACID transaction that inserts the alert,
+        // so a collision can never abort a life-critical write.
+        return db.alerts.raise({
+          id: 'RFA-' + randomUUID(),
           sessionId: patientInfo.sessionId,
           patientId: patientInfo.id,
-          tokenNumber: patientInfo.tokenNumber || 'EMERG-' + Math.floor(100 + Math.random() * 900),
+          tokenNumber: patientInfo.tokenNumber,
           patientName: patientInfo.name,
           age: patientInfo.age,
           gender: patientInfo.gender,
@@ -108,11 +118,7 @@ export class RedFlagEngine {
           severity: rule.severity,
           detectedAt: new Date().toISOString(),
           status: 'PENDING'
-        };
-
-        // Persist alert + escalate queue priority + audit log in one SQL
-        // transaction, then broadcast to the triage dashboard over SSE.
-        return db.alerts.raise(alert);
+        });
       }
     }
 

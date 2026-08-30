@@ -1,4 +1,5 @@
 import { MedicalEntity, DocumentOcrResult } from '../db/schema.js';
+import { genId } from '../db/store.js'; // UUID-based ids (SEC-015)
 
 export interface OcrProcessingPipelineResult {
   ocrResult: DocumentOcrResult;
@@ -47,7 +48,7 @@ Status: Stable on discharge.`;
     const processingTimeMs = Math.max(800, Date.now() - startTime + Math.floor(Math.random() * 600));
 
     const ocrResult: DocumentOcrResult = {
-      id: 'OCR-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      id: genId('OCR-'), // UUID-based (SEC-015)
       documentId,
       rawText: extractedText,
       confidence: 0.96,
@@ -72,7 +73,7 @@ Status: Stable on discharge.`;
         const isAbnormal = numVal < 12.0;
 
         const ent: MedicalEntity = {
-          id: 'ENT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+          id: genId('ENT-'), // UUID-based (SEC-015)
           documentId,
           patientId,
           entityType: 'INVESTIGATION',
@@ -104,7 +105,7 @@ Status: Stable on discharge.`;
         const isAbnormal = parseInt(val) > 20;
 
         entities.push({
-          id: 'ENT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+          id: genId('ENT-'), // UUID-based (SEC-015)
           documentId,
           patientId,
           entityType: 'INVESTIGATION',
@@ -132,7 +133,7 @@ Status: Stable on discharge.`;
       // Medications
       if (lower.includes('amlodipine')) {
         entities.push({
-          id: 'ENT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+          id: genId('ENT-'), // UUID-based (SEC-015)
           documentId,
           patientId,
           entityType: 'MEDICATION',
@@ -149,7 +150,7 @@ Status: Stable on discharge.`;
 
       if (lower.includes('guggulu') || lower.includes('yogaraj')) {
         entities.push({
-          id: 'ENT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+          id: genId('ENT-'), // UUID-based (SEC-015)
           documentId,
           patientId,
           entityType: 'MEDICATION',
@@ -166,7 +167,7 @@ Status: Stable on discharge.`;
 
       if (lower.includes('shallaki') || lower.includes('boswellia')) {
         entities.push({
-          id: 'ENT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+          id: genId('ENT-'), // UUID-based (SEC-015)
           documentId,
           patientId,
           entityType: 'MEDICATION',
@@ -184,7 +185,7 @@ Status: Stable on discharge.`;
       // Diagnoses
       if (lower.includes('hypertension')) {
         entities.push({
-          id: 'ENT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+          id: genId('ENT-'), // UUID-based (SEC-015)
           documentId,
           patientId,
           entityType: 'DIAGNOSIS',
@@ -198,7 +199,7 @@ Status: Stable on discharge.`;
 
       if (lower.includes('sandhivata') || lower.includes('osteoarthritis')) {
         entities.push({
-          id: 'ENT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+          id: genId('ENT-'), // UUID-based (SEC-015)
           documentId,
           patientId,
           entityType: 'DIAGNOSIS',

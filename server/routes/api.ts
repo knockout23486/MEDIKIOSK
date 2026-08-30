@@ -1,6 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { db, genId } from '../db/store.js';
 import { ClinicalAIService } from '../services/clinicalEngine.js';
 import { RedFlagEngine } from '../services/redFlagEngine.js';
@@ -77,30 +77,30 @@ async function sessionPatientId(sessionId: unknown): Promise<string | null | und
   return session ? session.patientId : null;
 }
 
-// Login rate limiter (SEC-012) — created lazily so environment overrides are
-// honored, and keyed per IP + username. Default: 10 attempts / 15 minutes.
-let loginLimiter: ReturnType<typeof rateLimit> | null = null;
-function getLoginLimiter() {
-  if (!loginLimiter) {
-    loginLimiter = rateLimit({
-      windowMs: Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
-      limit: Number(process.env.LOGIN_RATE_LIMIT_MAX ?? 10),
-      standardHeaders: true,
-      legacyHeaders: false,
-      keyGenerator: (req: Request) =>
-        `${req.ip}:${typeof req.body?.username === 'string' ? req.body.username.slice(0, 64) : ''}`,
-      handler: (_req: Request, res: Response) => {
-        console.warn('[Auth] Rate limit: too many login attempts.');
-        res.status(429).json({
-          success: false,
-          code: 'RATE_LIMITED',
-          message: 'Too many login attempts. Please try again later.'
-        });
-      }
+// Login rate limiter (SEC-012). Constructed ONCE at module initialization
+// (express-rate-limit validates against per-request construction); keyed per
+// IP + username. Default: 10 attempts / 15 minutes. Tests override the limit
+// via CLI env, e.g. `LOGIN_RATE_LIMIT_MAX=1000 npm run test:auth`.
+const loginLimiter = rateLimit({
+  windowMs: Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
+  limit: Number(process.env.LOGIN_RATE_LIMIT_MAX ?? 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  // ipKeyGenerator normalizes IPv4/IPv6 (+ mapped) addresses so limits cannot
+  // be bypassed by switching address families; username adds per-account keying.
+  keyGenerator: (req: Request) =>
+    `${ipKeyGenerator(req.ip ?? 'unknown', 56)}:${
+      typeof req.body?.username === 'string' ? req.body.username.slice(0, 64) : ''
+    }`,
+  handler: (_req: Request, res: Response) => {
+    console.warn('[Auth] Rate limit: too many login attempts.');
+    res.status(429).json({
+      success: false,
+      code: 'RATE_LIMITED',
+      message: 'Too many login attempts. Please try again later.'
     });
   }
-  return loginLimiter;
-}
+});
 
 // 1. REAL-TIME SERVER-SENT EVENTS (SSE) — authenticated (token via query param,
 //    because EventSource cannot set HTTP headers).
@@ -129,7 +129,7 @@ apiRouter.get('/events', requireAuth(), (req, res) => {
 // PUBLIC ROUTE — the single entry point of the security boundary. EVERY login
 // (demo roles included) must present a valid username + password; the bcrypt
 // hash comparison is mandatory (SEC-006/SEC-007). No passwordless path exists.
-apiRouter.post('/auth/login', (req, res, next) => getLoginLimiter()(req, res, next), wrap(async (req, res) => {
+apiRouter.post('/auth/login', loginLimiter, wrap(async (req, res) => {
   const { username, password } = req.body;
 
   // Strict shape check: both credentials are always required.

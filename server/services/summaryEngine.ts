@@ -1,4 +1,4 @@
-import { db } from '../db/store.js';
+import { db, genId } from '../db/store.js';
 import { AiSummary, ProvenanceSource } from '../db/schema.js';
 import { FusionEngine } from './fusionEngine.js';
 
@@ -21,7 +21,7 @@ export class SummaryEngine {
     const hpi = `Patient reports insidious onset of bilateral knee discomfort for the past 6 months. Symptoms are characterized by deep aching and morning stiffness lasting ~30-45 minutes. Aggravated by cold weather, climbing stairs, and prolonged standing. Partially relieved by warm oil application and rest. Associated with audible crepitus during bending.`;
 
     const summary: AiSummary = {
-      id: 'SUM-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      id: genId('SUM-'), // UUID-based (SEC-015)
       sessionId,
       patientId,
       version: 1,

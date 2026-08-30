@@ -20,6 +20,7 @@
 import { config as loadEnv } from 'dotenv';
 loadEnv();
 
+import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
@@ -116,9 +117,14 @@ function toDomainList<T>(rows: Array<Record<string, unknown> | object>): T[] {
   return rows.map((r) => toDomain<T>(r));
 }
 
-/** Random, collision-tolerant row id in the legacy 'PREFIX-XXXXXXX' style. */
+/**
+ * Collision-proof row id (SEC-015): PREFIX + crypto.randomUUID().
+ * Math.random() base-36 ids carried only ~35 bits of entropy with a skewed
+ * distribution — under concurrency they WILL collide on primary keys and
+ * abort transactions. UUID v4 is cryptographically random (122 bits).
+ */
 export function genId(prefix: string): string {
-  return prefix + Math.random().toString(36).substring(2, 9).toUpperCase();
+  return prefix + randomUUID();
 }
 
 const now = () => new Date().toISOString();
@@ -130,6 +136,11 @@ async function nextSeq(exec: Tx, name: string): Promise<number> {
 }
 
 export interface AuditLogInput extends Omit<AuditLog, 'id' | 'timestamp'> {}
+/** Red-flag alert payload: id/tokenNumber optional (assigned robustly in-tx). */
+export interface RedFlagAlertInput extends Omit<RedFlagAlert, 'id' | 'tokenNumber'> {
+  id?: string;
+  tokenNumber?: string;
+}
 export interface NotificationInput extends Omit<NotificationItem, 'id' | 'timestamp'> {}
 export interface IntegrationEventInput extends Omit<IntegrationEvent, 'id' | 'timestamp'> {}
 
@@ -174,6 +185,7 @@ export const db = {
     await pool.query(`CREATE SEQUENCE IF NOT EXISTS mk_patient_id_seq START 129`);
     await pool.query(`CREATE SEQUENCE IF NOT EXISTS appointment_number_seq START 100`);
     await pool.query(`CREATE SEQUENCE IF NOT EXISTS queue_token_number_seq START 100`);
+    await pool.query(`CREATE SEQUENCE IF NOT EXISTS emerg_token_seq START 1000`);
   },
 
   async close(): Promise<void> {
@@ -886,18 +898,35 @@ export const db = {
 
   // ---- red-flag safety engine ---------------------------------------------------------
   alerts: {
+    /**
+     * Raises an emergency red-flag in ONE SQL transaction: alert insert +
+     * queue priority escalation + audit log.
+     *
+     * SEC-014: when the caller has no token number, it is allocated from the
+     * `emerg_token_seq` PostgreSQL sequence INSIDE this transaction — never
+     * from Math.random() in memory (the old 900-value pool collided on
+     * queue_tokens.token_number's UNIQUE constraint and silently dropped
+     * life-critical alerts when the transaction aborted).
+     */
     async list(): Promise<RedFlagAlert[]> {
       return toDomainList<RedFlagAlert>(
         await orm.select().from(t.redFlagAlerts).orderBy(desc(t.redFlagAlerts.detectedAt))
       );
     },
 
-    /**
-     * Raises an emergency red-flag: alert insert + queue priority escalation +
-     * audit log in one transaction, then a real-time SSE broadcast.
-     */
-    async raise(alert: RedFlagAlert): Promise<RedFlagAlert> {
-      await runInTransaction(async (tx) => {
+    async raise(input: RedFlagAlertInput): Promise<RedFlagAlert> {
+      const alert = await runInTransaction(async (tx) => {
+        let tokenNumber = (input.tokenNumber ?? '').trim();
+        if (!tokenNumber) {
+          const seq = await nextSeq(tx, 'emerg_token_seq');
+          tokenNumber = `EMERG-${String(seq).padStart(4, '0')}`;
+        }
+        const alert: RedFlagAlert = {
+          ...(input as RedFlagAlert),
+          id: input.id ?? genId('RFA-'),
+          tokenNumber,
+          status: input.status ?? 'PENDING'
+        };
         await tx.insert(t.redFlagAlerts).values(alert);
         await tx
           .update(t.queueTokens)
@@ -913,6 +942,7 @@ export const db = {
           details: { ruleId: alert.triggerRule, severity: alert.severity, triggerInput: alert.triggerInput },
           ipAddress: '127.0.0.1'
         });
+        return alert;
       });
       db.broadcast('RED_FLAG_TRIGGERED', alert);
       return alert;
@@ -1129,6 +1159,12 @@ export const db = {
         SELECT setval('queue_token_number_seq', COALESCE((
           SELECT MAX((substring(token_number from '(\\d+)$'))::int) FROM queue_tokens
         ), 99))
+      `));
+      await tx.execute(sql.raw(`
+        SELECT setval('emerg_token_seq', COALESCE((
+          SELECT MAX((substring(token_number from '(\\d+)$'))::int)
+          FROM red_flag_alerts WHERE token_number LIKE 'EMERG-%'
+        ), 999))
       `));
     });
     this.broadcast('STATE_RESET', { timestamp: now() });
