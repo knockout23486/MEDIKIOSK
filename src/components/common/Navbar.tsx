@@ -18,6 +18,13 @@ export const Navbar: React.FC = () => {
   const { loadHeroPatient, resetDemoData } = useDemo();
   const location = useLocation();
 
+  /**
+   * Role-gated navigation: a tab is only rendered when the active session's
+   * role is included in that tab's allowed-role list. Kiosk remains available
+   * to every role.
+   */
+  const canAccess = (allowedRoles: string[]): boolean => allowedRoles.includes(role);
+
   const urgentAlertsCount = (liveTriageAlerts ?? []).filter(a => a.status === 'PENDING').length;
 
   return (
@@ -75,55 +82,63 @@ export const Navbar: React.FC = () => {
           >
             Patient Kiosk
           </Link>
-          <Link
-            to="/doctor"
-            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition ${
-              location.pathname.startsWith('/doctor')
-                ? 'bg-clinical-50 text-clinical-700 font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <Stethoscope className="w-4 h-4 text-clinical-600" />
-            Doctor Dashboard
-          </Link>
-          <Link
-            to="/triage"
-            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition ${
-              location.pathname.startsWith('/triage')
-                ? 'bg-red-50 text-red-700 font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <ShieldAlert className="w-4 h-4 text-red-600" />
-            Triage Staff
-            {urgentAlertsCount > 0 && (
-              <span className="bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full animate-pulse">
-                {urgentAlertsCount}
-              </span>
-            )}
-          </Link>
-          <Link
-            to="/admin"
-            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition ${
-              location.pathname.startsWith('/admin')
-                ? 'bg-slate-100 text-slate-900 font-semibold'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-            }`}
-          >
-            <Settings className="w-4 h-4 text-slate-600" />
-            Hospital Admin
-          </Link>
-          <Link
-            to="/demo"
-            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition ${
-              location.pathname.startsWith('/demo')
-                ? 'bg-amber-50 text-amber-900 font-semibold'
-                : 'text-amber-700 hover:bg-amber-50'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-600" />
-            SIH Demo Suite
-          </Link>
+          {canAccess(['DOCTOR', 'ADMIN']) && (
+            <Link
+              to="/doctor"
+              className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition ${
+                location.pathname.startsWith('/doctor')
+                  ? 'bg-clinical-50 text-clinical-700 font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Stethoscope className="w-4 h-4 text-clinical-600" />
+              Doctor Dashboard
+            </Link>
+          )}
+          {canAccess(['TRIAGE', 'DOCTOR', 'ADMIN']) && (
+            <Link
+              to="/triage"
+              className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition ${
+                location.pathname.startsWith('/triage')
+                  ? 'bg-red-50 text-red-700 font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <ShieldAlert className="w-4 h-4 text-red-600" />
+              Triage Staff
+              {urgentAlertsCount > 0 && (
+                <span className="bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full animate-pulse">
+                  {urgentAlertsCount}
+                </span>
+              )}
+            </Link>
+          )}
+          {canAccess(['ADMIN', 'SYSTEM_ADMIN']) && (
+            <Link
+              to="/admin"
+              className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition ${
+                location.pathname.startsWith('/admin')
+                  ? 'bg-slate-100 text-slate-900 font-semibold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              <Settings className="w-4 h-4 text-slate-600" />
+              Hospital Admin
+            </Link>
+          )}
+          {canAccess(['SYSTEM_ADMIN']) && (
+            <Link
+              to="/demo"
+              className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition ${
+                location.pathname.startsWith('/demo')
+                  ? 'bg-amber-50 text-amber-900 font-semibold'
+                  : 'text-amber-700 hover:bg-amber-50'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-amber-600" />
+              SIH Demo Suite
+            </Link>
+          )}
         </nav>
 
         {/* Right Utility Controls */}
