@@ -43,7 +43,11 @@ export async function authFetch(input: string, init: RequestInit = {}): Promise<
   if (authToken) headers.set('Authorization', `Bearer ${authToken}`);
 
   const response = await fetch(input, { ...init, headers });
-  if ((response.status === 401 || response.status === 403) && !isAuthEndpoint(input)) {
+  // Only an explicitly rejected/unauthenticated session (401) destroys the
+  // active session and bounces to /login. A 403 FORBIDDEN (authenticated but
+  // lacking permission for a resource) is passed through untouched so the
+  // calling code can surface it without logging the user out.
+  if (response.status === 401 && !isAuthEndpoint(input)) {
     authToken = null;
     localStorage.clear();
     sessionStorage.clear();
