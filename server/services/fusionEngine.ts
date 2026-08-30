@@ -9,17 +9,19 @@ export interface ProvenanceFact {
 }
 
 export class FusionEngine {
-  public static fusePatientData(sessionId: string, patientId: string): {
+  public static async fusePatientData(sessionId: string, patientId: string): Promise<{
     provenanceFacts: ProvenanceFact[];
     medications: Array<{ name: string; dose: string; freq: string; source: string; confidence: number }>;
     allergies: Array<{ allergen: string; severity: string; reaction: string }>;
     investigations: Array<{ test: string; value: string; date: string; isAbnormal: boolean }>;
     pastDiagnoses: string[];
-  } {
-    const state = db.getState();
-    const answers = state.clinicalAnswers.filter(a => a.sessionId === sessionId);
-    const entities = state.medicalEntities.filter(e => e.patientId === patientId);
-    const abdm = state.abdmRecords.filter(r => r.patientId === patientId);
+  }> {
+    // Reads are executed as SQL against PostgreSQL.
+    const [answers, entities, abdm] = await Promise.all([
+      db.clinical.answersBySession(sessionId),
+      db.documents.entitiesByPatient(patientId),
+      db.abdm.recordsByPatient(patientId)
+    ]);
 
     const provenanceFacts: ProvenanceFact[] = [];
     const medications: Array<{ name: string; dose: string; freq: string; source: string; confidence: number }> = [];

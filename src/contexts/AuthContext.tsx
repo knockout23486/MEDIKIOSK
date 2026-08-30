@@ -1,11 +1,26 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types/index.js';
+import { api, setAuthToken, getAuthToken } from '../services/api.js';
+
+// Documented demo credentials for this SIH showcase platform (SEC-006 note:
+// the API strictly verifies each password against its bcrypt hash — removing
+// this map only removes the demo convenience, not security. Production
+// deployments provision real per-user accounts instead).
+const DEMO_CREDENTIALS: Record<UserRole, { username: string; password: string }> = {
+  PATIENT: { username: 'patient', password: 'demo123' },
+  DOCTOR: { username: 'doctor', password: 'doctor123' },
+  TRIAGE: { username: 'triage', password: 'triage123' },
+  ADMIN: { username: 'admin', password: 'admin123' },
+  SYSTEM_ADMIN: { username: 'sysadmin', password: 'sysadmin123' }
+};
 
 interface AuthContextType {
   user: User;
   role: UserRole;
+  isAuthenticated: boolean;
   setRole: (role: UserRole) => void;
   switchUser: (role: UserRole) => void;
+  logout: () => Promise<void>;
 }
 
 const DEFAULT_USERS: Record<UserRole, User> = {
@@ -67,14 +82,52 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [role, setRoleState] = useState<UserRole>('PATIENT');
   const [user, setUser] = useState<User>(DEFAULT_USERS.PATIENT);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!getAuthToken());
 
-  const switchUser = (newRole: UserRole) => {
-    setRoleState(newRole);
-    setUser(DEFAULT_USERS[newRole] || DEFAULT_USERS.PATIENT);
+  /**
+   * Authenticates against the API with the demo account credentials for the
+   * selected role and caches the issued JWT (SEC-003/SEC-006): every
+   * subsequent api.* call carries `Authorization: Bearer <token>`. Falls back
+   * to the local demo profile when the API is unreachable (offline demo mode).
+   */
+  /**
+   * Ends the current session server-side (SEC-017): the active JWT is added
+   * to the API's revocation blocklist, so it cannot be reused on this shared
+   * kiosk after the operator walks away.
+   */
+  const logout = async () => {
+    await api.logout();
+    setIsAuthenticated(false);
+    setRoleState('PATIENT');
+    setUser(DEFAULT_USERS.PATIENT);
   };
 
+  const switchUser = async (newRole: UserRole) => {
+    setRoleState(newRole);
+    setUser(DEFAULT_USERS[newRole] || DEFAULT_USERS.PATIENT);
+    try {
+      // Revoke the outgoing session before issuing the next one (SEC-017).
+      if (getAuthToken()) await api.logout();
+      const creds = DEMO_CREDENTIALS[newRole];
+      const res = await api.login(creds.username, creds.password);
+      if (res?.success && res?.token) {
+        setAuthToken(res.token);
+        if (res.user) setUser(res.user as unknown as User);
+        setIsAuthenticated(true);
+      }
+    } catch (e) {
+      console.warn('[Auth] API login failed — continuing in offline demo mode.', e);
+    }
+  };
+
+  // Establish the default kiosk session on first render.
+  useEffect(() => {
+    void switchUser('PATIENT');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, role, setRole: switchUser, switchUser }}>
+    <AuthContext.Provider value={{ user, role, isAuthenticated, setRole: switchUser, switchUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

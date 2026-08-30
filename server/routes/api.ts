@@ -1,5 +1,7 @@
-import express from 'express';
-import { db } from '../db/store.js';
+import express, { type Request, type Response, type NextFunction } from 'express';
+import bcrypt from 'bcryptjs';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import { db, genId } from '../db/store.js';
 import { ClinicalAIService } from '../services/clinicalEngine.js';
 import { RedFlagEngine } from '../services/redFlagEngine.js';
 import { OcrEngine } from '../services/ocrEngine.js';
@@ -9,11 +11,100 @@ import { QueueEngine } from '../services/queueEngine.js';
 import { AbdmAdapter } from '../services/abdmAdapter.js';
 import { HisAdapter } from '../services/hisAdapter.js';
 import { seedDatabase } from '../db/seed.js';
+import { requireAuth, signToken, JWT_EXPIRES_IN } from '../middleware/auth.js';
+import type { UserRole } from '../db/schema.js';
 
 export const apiRouter = express.Router();
 
-// 1. REAL-TIME SERVER-SENT EVENTS (SSE)
-apiRouter.get('/events', (req, res) => {
+// ============================================================================
+// SECURITY BOUNDARY (SEC-003)
+// ----------------------------------------------------------------------------
+// Every route below is guarded by `requireAuth(...roles)`:
+//   * a valid `Authorization: Bearer <JWT>` is required — 401 otherwise;
+//   * the caller's role must be in the route's allow-list — 403 otherwise;
+//   * PATIENT-role reads of individual records additionally enforce record
+//     ownership (IDOR protection).
+// The ONLY public endpoint is POST /api/auth/login.
+// ============================================================================
+
+// Roles
+const STAFF_READ: UserRole[] = ['DOCTOR', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'];
+const ALL: UserRole[] = ['PATIENT', 'DOCTOR', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'];
+
+// Every handler is async — wrap them so a rejected promise (SQL failure etc.)
+// becomes a controlled 500 instead of an unhandled rejection.
+const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    fn(req, res).catch(next);
+  };
+};
+
+/** PATIENT-role ownership guard: may a PATIENT read this patient's data? */
+async function patientReadableByCaller(patientId: string, user: { id: string; role: UserRole }): Promise<boolean> {
+  if (user.role !== 'PATIENT') return true; // staff access is governed by RBAC
+  const patient = await db.patients.get(patientId);
+  return !!patient && patient.userId === user.id;
+}
+
+function forbidden(res: Response, message: string) {
+  return res.status(403).json({ success: false, code: 'FORBIDDEN', message });
+}
+
+/**
+ * Write-side ownership guard (SEC-009/SEC-011): when a PATIENT-role caller
+ * references a patientId in a write payload, that id must resolve to the
+ * patient record owned by the JWT subject. Staff roles are authorized by
+ * their route RBAC allow-list and pass through.
+ */
+async function patientWritableByCaller(
+  patientId: unknown,
+  user: { id: string; role: UserRole }
+): Promise<boolean> {
+  if (typeof patientId !== 'string' || patientId.length === 0) return true; // staff-only flows
+  if (user.role !== 'PATIENT') return true;
+  return patientReadableByCaller(patientId, user);
+}
+
+/**
+ * Session-integrity guard: a clinical session id referenced in a payload must
+ * belong to the claimed patientId (enforced for EVERY role — this is data
+ * integrity, not just authorization). Returns null when the session is
+ * unknown (legacy demo flows may reference not-yet-persisted sessions).
+ */
+async function sessionPatientId(sessionId: unknown): Promise<string | null | undefined> {
+  if (typeof sessionId !== 'string' || sessionId.length === 0) return undefined;
+  const session = await db.clinical.getSession(sessionId);
+  return session ? session.patientId : null;
+}
+
+// Login rate limiter (SEC-012). Constructed ONCE at module initialization
+// (express-rate-limit validates against per-request construction); keyed per
+// IP + username. Default: 10 attempts / 15 minutes. Tests override the limit
+// via CLI env, e.g. `LOGIN_RATE_LIMIT_MAX=1000 npm run test:auth`.
+const loginLimiter = rateLimit({
+  windowMs: Number(process.env.LOGIN_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
+  limit: Number(process.env.LOGIN_RATE_LIMIT_MAX ?? 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  // ipKeyGenerator normalizes IPv4/IPv6 (+ mapped) addresses so limits cannot
+  // be bypassed by switching address families; username adds per-account keying.
+  keyGenerator: (req: Request) =>
+    `${ipKeyGenerator(req.ip ?? 'unknown', 56)}:${
+      typeof req.body?.username === 'string' ? req.body.username.slice(0, 64) : ''
+    }`,
+  handler: (_req: Request, res: Response) => {
+    console.warn('[Auth] Rate limit: too many login attempts.');
+    res.status(429).json({
+      success: false,
+      code: 'RATE_LIMITED',
+      message: 'Too many login attempts. Please try again later.'
+    });
+  }
+});
+
+// 1. REAL-TIME SERVER-SENT EVENTS (SSE) — authenticated (token via query param,
+//    because EventSource cannot set HTTP headers).
+apiRouter.get('/events', requireAuth(), (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -23,9 +114,22 @@ apiRouter.get('/events', (req, res) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   });
 
-  // Heartbeat every 25s
+  // Heartbeat every 25s — also re-checks the token blocklist (SEC-017) so a
+  // logged-out session's open stream is closed within one heartbeat.
+  const sessionJti = req.jwt?.jti;
   const interval = setInterval(() => {
-    res.write(`event: ping\ndata: ${JSON.stringify({ time: new Date().toISOString() })}\n\n`);
+    void (async () => {
+      try {
+        if (sessionJti && (await db.revocation.isRevoked(sessionJti))) {
+          clearInterval(interval);
+          res.end();
+          return;
+        }
+        res.write(`event: ping\ndata: ${JSON.stringify({ time: new Date().toISOString() })}\n\n`);
+      } catch {
+        /* stream closed */
+      }
+    })();
   }, 25000);
 
   req.on('close', () => {
@@ -34,230 +138,242 @@ apiRouter.get('/events', (req, res) => {
   });
 });
 
-// 2. AUTHENTICATION & USERS
-apiRouter.post('/auth/login', (req, res) => {
-  const { username, password, role } = req.body;
-  const state = db.getState();
-  const user = state.users.find(u => (u.username === username || u.role === role));
-  if (user) {
-    db.addAuditLog({
+// 2. AUTHENTICATION & USERS --------------------------------------------------
+// PUBLIC ROUTE — the single entry point of the security boundary. EVERY login
+// (demo roles included) must present a valid username + password; the bcrypt
+// hash comparison is mandatory (SEC-006/SEC-007). No passwordless path exists.
+apiRouter.post('/auth/login', loginLimiter, wrap(async (req, res) => {
+  const { username, password } = req.body;
+
+  // Strict shape check: both credentials are always required.
+  if (typeof username !== 'string' || typeof password !== 'string' || username.length === 0 || password.length === 0) {
+    return res.status(401).json({
+      success: false,
+      code: 'INVALID_CREDENTIALS',
+      message: 'Username and password are required.'
+    });
+  }
+
+  const user = await db.users.findByLogin(username);
+
+  // Constant-work comparison: run bcrypt even for unknown usernames so
+  // response timing cannot enumerate valid accounts.
+  const BCRYPT_DUMMY_HASH = '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZUbE0f6b/6j3oA1sV8g2YQeXwJmR1e';
+  const passwordOk = await bcrypt.compare(password, user?.passwordHash ?? BCRYPT_DUMMY_HASH);
+
+  if (!user || !passwordOk) {
+    await db.addAuditLog({
       correlationId: 'AUTH-LOGIN',
-      actorId: user.id,
-      actorRole: user.role,
-      action: 'USER_LOGIN_SUCCESS',
+      actorId: String(username),
+      actorRole: 'PATIENT',
+      action: 'USER_LOGIN_FAILURE',
       resourceType: 'USER',
-      resourceId: user.id,
-      details: { username: user.username, role: user.role },
+      resourceId: String(username),
+      details: { reason: 'INVALID_CREDENTIALS' },
       ipAddress: req.ip || '127.0.0.1'
     });
-    return res.json({ success: true, user });
+    return res.status(401).json({ success: false, code: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' });
   }
-  return res.status(401).json({ success: false, message: 'Invalid credentials' });
-});
 
-apiRouter.get('/users', (req, res) => {
-  res.json(db.getState().users);
-});
-
-// 3. PATIENTS & ABHA
-apiRouter.get('/patients', (req, res) => {
-  res.json(db.getState().patients);
-});
-
-apiRouter.get('/patients/:id', (req, res) => {
-  const patient = db.getState().patients.find(p => p.id === req.params.id || p.mkPatientId === req.params.id);
-  if (!patient) return res.status(404).json({ message: 'Patient not found' });
-  res.json(patient);
-});
-
-apiRouter.post('/patients', (req, res) => {
-  const state = db.getState();
-  const count = state.patients.length + 125;
-  const newPatient = {
-    id: 'PAT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-    mkPatientId: `MK-PAT-2026-${String(count).padStart(6, '0')}`,
-    registeredAt: new Date().toISOString(),
-    isDemo: true,
-    ...req.body
-  };
-  state.patients.push(newPatient);
-  db.save();
-
-  db.addAuditLog({
-    correlationId: 'PAT-REG',
-    actorId: newPatient.id,
-    actorRole: 'PATIENT',
-    action: 'PATIENT_REGISTERED',
-    resourceType: 'PATIENT',
-    resourceId: newPatient.id,
-    details: { mkPatientId: newPatient.mkPatientId, name: newPatient.name },
+  await db.addAuditLog({
+    correlationId: 'AUTH-LOGIN',
+    actorId: user.id,
+    actorRole: user.role,
+    action: 'USER_LOGIN_SUCCESS',
+    resourceType: 'USER',
+    resourceId: user.id,
+    details: { username: user.username, role: user.role, authMode: 'USERNAME_PASSWORD' },
     ipAddress: req.ip || '127.0.0.1'
   });
 
-  res.json(newPatient);
-});
+  const token = signToken(user);
+  const { passwordHash: _ph, ...safeUser } = user;
+  return res.json({ success: true, user: safeUser, token, tokenType: 'Bearer', expiresIn: JWT_EXPIRES_IN });
+}));
 
-apiRouter.post('/abha/verify', async (req, res) => {
+// Session introspection for the client.
+apiRouter.get('/auth/me', requireAuth(), wrap(async (req, res) => {
+  res.json({ success: true, user: req.user, expires: JWT_EXPIRES_IN });
+}));
+
+/**
+ * SEC-017 — server-side session termination. Inserts the caller's JWT jti
+ * into the revoked_tokens blocklist (until its natural expiry); every
+ * subsequent request carrying this token is rejected with 401 by
+ * requireAuth. Essential on shared/public kiosk hardware where a dropped
+ * client token must not remain mathematically valid for 12 hours.
+ */
+apiRouter.post('/auth/logout', requireAuth(), wrap(async (req, res) => {
+  const { jti, exp } = req.jwt ?? {};
+  if (jti) {
+    await db.revocation.revoke(jti, new Date((exp ?? Math.floor(Date.now() / 1000) + 60) * 1000).toISOString());
+  }
+  await db.addAuditLog({
+    correlationId: 'AUTH-LOGOUT',
+    actorId: req.user!.id,
+    actorRole: req.user!.role,
+    action: 'USER_LOGOUT',
+    resourceType: 'USER',
+    resourceId: req.user!.id,
+    details: { jti },
+    ipAddress: req.ip || '127.0.0.1'
+  });
+  res.json({ success: true, message: 'Session revoked. Token is no longer valid.' });
+}));
+
+apiRouter.get('/users', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
+  const users = await db.users.list();
+  res.json(users.map(({ passwordHash: _ph, ...u }) => u));
+}));
+
+// 3. PATIENTS & ABHA -----------------------------------------------------------
+apiRouter.get('/patients', requireAuth(...STAFF_READ), wrap(async (_req, res) => {
+  res.json(await db.patients.list());
+}));
+
+apiRouter.get('/patients/:id', requireAuth(), wrap(async (req, res) => {
+  const patient = await db.patients.get(req.params.id);
+  if (!patient) return res.status(404).json({ message: 'Patient not found' });
+  // IDOR protection: a PATIENT token may only read its OWN record.
+  if (req.user!.role === 'PATIENT' && patient.userId !== req.user!.id) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own record.' });
+  }
+  const { userId: _u, ...safe } = patient;
+  res.json(safe);
+}));
+
+apiRouter.post('/patients', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
+  if (!req.body || typeof req.body.name !== 'string' || req.body.name.trim() === '') {
+    return res.status(400).json({ success: false, message: 'Patient name is required' });
+  }
+  // Single SQL transaction: patient row + sequence-allocated MK-PAT id +
+  // DPDP audit entry. Safe under concurrent kiosk registrations.
+  const newPatient = await db.patients.register(req.body, { ipAddress: req.ip });
+  const { userId: _u, ...safe } = newPatient;
+  res.json(safe);
+}));
+
+apiRouter.post('/abha/verify', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   const { abhaNumber, otp } = req.body;
   const result = await AbdmAdapter.verifyAbha(abhaNumber, otp);
   res.json(result);
-});
+}));
 
-// 4. CONSENTS
-apiRouter.get('/consents/:patientId', (req, res) => {
-  const consent = db.getState().consents.find(c => c.patientId === req.params.patientId);
-  res.json(consent || null);
-});
-
-apiRouter.post('/consents', (req, res) => {
-  const state = db.getState();
-  const newConsent = {
-    id: 'CNS-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-    version: 'v2.4-DPDP-2026',
-    status: 'ACTIVE' as const,
-    grantedAt: new Date().toISOString(),
-    ipAddress: req.ip || '192.168.1.104 (Kiosk)',
-    signatureType: 'ELECTRONIC_DEMO' as const,
-    ...req.body
-  };
-
-  const existingIdx = state.consents.findIndex(c => c.patientId === newConsent.patientId);
-  if (existingIdx >= 0) {
-    state.consents[existingIdx] = newConsent;
-  } else {
-    state.consents.push(newConsent);
+// 4. CONSENTS --------------------------------------------------------------------
+apiRouter.get('/consents/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own consent record.' });
   }
-  db.save();
+  const consent = await db.consents.get(req.params.patientId);
+  res.json(consent || null);
+}));
 
-  db.addAuditLog({
-    correlationId: 'CONSENT-GRANT',
-    actorId: newConsent.patientId,
-    actorRole: 'PATIENT',
-    action: 'DPDP_CONSENT_GRANTED',
-    resourceType: 'CONSENT',
-    resourceId: newConsent.id,
-    details: newConsent.purposes,
-    ipAddress: req.ip || '127.0.0.1'
-  });
-
+apiRouter.post('/consents', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
+  // SEC-009: a PATIENT token may only grant consent for its OWN record.
+  if (!(await patientWritableByCaller(req.body?.patientId, req.user!))) {
+    return forbidden(res, 'Patients may only grant consent for their own record.');
+  }
+  // Atomic upsert on patient_id + audit entry in one transaction.
+  const newConsent = await db.consents.grant(req.body, { ipAddress: req.ip });
   res.json(newConsent);
-});
+}));
 
-// 5. HOSPITALS, DEPARTMENTS & PRACTITIONERS
-apiRouter.get('/hospitals', (req, res) => {
-  res.json(db.getState().hospitals);
-});
+// 5. HOSPITALS, DEPARTMENTS & PRACTITIONERS (non-PHI reference data) -------------
+apiRouter.get('/hospitals', requireAuth(...ALL), wrap(async (_req, res) => {
+  res.json(await db.reference.hospitals());
+}));
 
-apiRouter.get('/departments', (req, res) => {
+apiRouter.get('/departments', requireAuth(...ALL), wrap(async (req, res) => {
   const { hospitalId } = req.query;
-  const deps = db.getState().departments.filter(d => !hospitalId || d.hospitalId === hospitalId);
-  res.json(deps);
-});
+  res.json(await db.reference.departments(typeof hospitalId === 'string' ? hospitalId : undefined));
+}));
 
-apiRouter.get('/doctors', (req, res) => {
+apiRouter.get('/doctors', requireAuth(...ALL), wrap(async (req, res) => {
   const { departmentId, hospitalId } = req.query;
-  const docs = db.getState().practitioners.filter(d => 
-    (!departmentId || d.departmentId === departmentId) &&
-    (!hospitalId || d.hospitalId === hospitalId)
+  res.json(
+    await db.reference.practitioners({
+      departmentId: typeof departmentId === 'string' ? departmentId : undefined,
+      hospitalId: typeof hospitalId === 'string' ? hospitalId : undefined
+    })
   );
-  res.json(docs);
-});
+}));
 
-// 6. APPOINTMENTS & QUEUE
-apiRouter.get('/appointments', (req, res) => {
-  res.json(db.getState().appointments);
-});
+// 6. APPOINTMENTS & QUEUE ----------------------------------------------------------
+apiRouter.get('/appointments', requireAuth(...STAFF_READ), wrap(async (_req, res) => {
+  res.json(await db.appointments.list());
+}));
 
-apiRouter.post('/appointments', (req, res) => {
-  const state = db.getState();
-  const count = state.appointments.length + 27;
-  const apt = {
-    id: 'APT-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-    appointmentNumber: `APT-2026-0828-${String(count).padStart(3, '0')}`,
-    bookedAt: new Date().toISOString(),
-    status: 'BOOKED' as const,
-    ...req.body
-  };
-  state.appointments.push(apt);
+apiRouter.post('/appointments', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
+  // SEC-009: a PATIENT token may only book for its OWN record.
+  if (!(await patientWritableByCaller(req.body?.patientId, req.user!))) {
+    return forbidden(res, 'Patients may only book appointments for themselves.');
+  }
+  // Atomic: appointment + queue token + SMS notification + audit log.
+  const { appointment, token } = await db.appointments.book(req.body, { ipAddress: req.ip });
+  res.json({ appointment, token });
+}));
 
-  // Auto-generate Token
-  const token = QueueEngine.generateToken(apt.patientId, apt.id, apt.practitionerId);
+apiRouter.get('/queue/tokens', requireAuth(...STAFF_READ), wrap(async (_req, res) => {
+  res.json(await db.queue.tokens());
+}));
 
-  db.addAuditLog({
-    correlationId: 'APT-BOOK',
-    actorId: apt.patientId,
-    actorRole: 'PATIENT',
-    action: 'APPOINTMENT_BOOKED',
-    resourceType: 'APPOINTMENT',
-    resourceId: apt.id,
-    details: { appointmentNumber: apt.appointmentNumber, tokenNumber: token.tokenNumber },
-    ipAddress: req.ip || '127.0.0.1'
-  });
-
-  // Add confirmation notification
-  db.addNotification({
-    patientId: apt.patientId,
-    channel: 'SMS',
-    title: 'Appointment Confirmed',
-    message: `Your appointment is confirmed. Token: ${token.tokenNumber}. Approx wait: ${token.estimatedWaitMins} mins.`,
-    status: 'DELIVERED'
-  });
-
-  res.json({ appointment: apt, token });
-});
-
-apiRouter.get('/queue/tokens', (req, res) => {
-  res.json(db.getState().queueTokens);
-});
-
-apiRouter.post('/queue/checkin', (req, res) => {
+apiRouter.post('/queue/checkin', requireAuth('PATIENT', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   const { tokenNumber, patientId } = req.body;
-  const state = db.getState();
-  const token = state.queueTokens.find(t => t.tokenNumber === tokenNumber || t.patientId === patientId);
+  // SEC-009: a PATIENT token may only check in tokens for its OWN record.
+  if (!(await patientWritableByCaller(patientId, req.user!))) {
+    return forbidden(res, 'Patients may only check in their own tokens.');
+  }
+  const token = await db.queue.checkIn(tokenNumber, patientId);
   if (!token) return res.status(404).json({ message: 'Token not found' });
-
-  token.status = 'WAITING';
-  token.checkInTime = new Date().toISOString();
-  db.save();
-
-  db.broadcast('QUEUE_CHECKIN', token);
+  if (req.user!.role === 'PATIENT' && token.patientId !== patientId &&
+      !(await patientReadableByCaller(token.patientId, req.user!))) {
+    return forbidden(res, 'Patients may only check in their own tokens.');
+  }
   res.json({ success: true, token });
-});
+}));
 
-apiRouter.post('/queue/advance', (req, res) => {
+apiRouter.post('/queue/advance', requireAuth('DOCTOR', 'TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
   const { practitionerId } = req.body;
-  const nextToken = QueueEngine.advanceQueue(practitionerId || 'PRAC-01');
+  const nextToken = await QueueEngine.advanceQueue(practitionerId || 'PRAC-01');
   res.json({ success: true, activeToken: nextToken });
-});
+}));
 
-// 7. CLINICAL INTAKE & ADAPTIVE HISTORY
-apiRouter.post('/clinical/questions', (req, res) => {
+// 7. CLINICAL INTAKE & ADAPTIVE HISTORY ----------------------------------------------
+apiRouter.post('/clinical/questions', requireAuth(...ALL), (req, res) => {
   const { chiefComplaint, isAyush } = req.body;
   const questions = ClinicalAIService.getInitialQuestions(chiefComplaint || '', !!isAyush);
   res.json(questions);
 });
 
-apiRouter.post('/clinical/session', (req, res) => {
-  const state = db.getState();
-  const session = {
-    id: 'SES-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-    startedAt: new Date().toISOString(),
-    status: 'IN_PROGRESS' as const,
-    redFlagTriggered: false,
-    ...req.body
-  };
-  state.clinicalSessions.push(session);
-  db.save();
+apiRouter.post('/clinical/session', requireAuth(...ALL), wrap(async (req, res) => {
+  // SEC-009: a PATIENT token may only open a session for its OWN record.
+  if (!(await patientWritableByCaller(req.body?.patientId, req.user!))) {
+    return forbidden(res, 'Patients may only start clinical sessions for themselves.');
+  }
+  const session = await db.clinical.createSession(req.body);
   res.json(session);
-});
+}));
 
-apiRouter.post('/clinical/answer', (req, res) => {
+apiRouter.post('/clinical/answer', requireAuth(...ALL), wrap(async (req, res) => {
   const { sessionId, questionId, questionText, answerText, inputMode, voiceTranscript, patientId } = req.body;
-  const state = db.getState();
-  const patient = state.patients.find(p => p.id === patientId);
+
+  // SEC-009: a PATIENT token may only write answers against its OWN patientId.
+  if (!(await patientWritableByCaller(patientId, req.user!))) {
+    return forbidden(res, 'Patients may only submit answers for their own record.');
+  }
+
+  // Session integrity (every role): a known sessionId must belong to the
+  // claimed patientId — otherwise anyone could append answers to anyone
+  // else's clinical intake.
+  const sessionOwner = await sessionPatientId(sessionId);
+  if (sessionOwner !== null && sessionOwner !== undefined && sessionOwner !== patientId) {
+    return forbidden(res, 'Clinical session does not belong to the claimed patient.');
+  }
+
+  const patient = patientId ? await db.patients.get(patientId) : undefined;
 
   const answer = {
-    id: 'ANS-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+    id: genId('ANS-'),
     sessionId,
     questionId,
     questionText,
@@ -270,8 +386,8 @@ apiRouter.post('/clinical/answer', (req, res) => {
     timestamp: new Date().toISOString()
   };
 
-  // Evaluate Emergency Red-Flags in real-time
-  const redFlag = RedFlagEngine.evaluateInput(
+  // Evaluate emergency red-flags in real time (alert persists via SQL tx).
+  const redFlag = await RedFlagEngine.evaluateInput(
     (voiceTranscript || answerText) + ' ' + questionText,
     { [questionId]: answerText },
     {
@@ -287,19 +403,26 @@ apiRouter.post('/clinical/answer', (req, res) => {
     answer.redFlagFlagged = true;
   }
 
-  state.clinicalAnswers.push(answer);
-  db.save();
+  await db.clinical.addAnswer(answer);
 
   res.json({ answer, redFlagAlert: redFlag });
-});
+}));
 
-apiRouter.post('/clinical/ayush', (req, res) => {
+apiRouter.post('/clinical/ayush', requireAuth(...ALL), wrap(async (req, res) => {
   const { sessionId, answers } = req.body;
-  const state = db.getState();
+
+  // SEC-009: a PATIENT token may only save assessments onto its OWN session.
+  const sessionOwner = await sessionPatientId(sessionId);
+  if (req.user!.role === 'PATIENT') {
+    if (!sessionOwner || !(await patientReadableByCaller(sessionOwner, req.user!))) {
+      return forbidden(res, 'Patients may only save assessments for their own sessions.');
+    }
+  }
+
   const prakritiCalc = ClinicalAIService.calculatePrakriti(answers || {});
 
   const assessment = {
-    id: 'AYUSH-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+    id: genId('AYUSH-'),
     sessionId,
     prakriti: {
       vata: prakritiCalc.vata,
@@ -329,248 +452,257 @@ apiRouter.post('/clinical/ayush', (req, res) => {
     sampraptiSummary: 'Prakupita Vata localizes in Janu Sandhi manifesting as Sandhivata (Osteoarthritis).'
   };
 
-  state.ayushAssessments.push(assessment);
-  db.save();
-
+  await db.clinical.saveAyushAssessment(assessment as any);
   res.json(assessment);
-});
+}));
 
-// 8. DOCUMENTS & OCR PIPELINE
-apiRouter.get('/documents/:patientId', (req, res) => {
-  const docs = db.getState().documents.filter(d => d.patientId === req.params.patientId);
-  res.json(docs);
-});
+// 8. DOCUMENTS & OCR PIPELINE -----------------------------------------------------------
+apiRouter.get('/documents/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own documents.' });
+  }
+  res.json(await db.documents.listByPatient(req.params.patientId));
+}));
 
-apiRouter.post('/documents/process-demo', async (req, res) => {
+apiRouter.post('/documents/process-demo', requireAuth(...ALL), wrap(async (req, res) => {
   const { documentId, patientId, fileName, rawText } = req.body;
-  const state = db.getState();
+
+  // SEC-018: bound the unstructured text BEFORE any parsing/regex work — a
+  // multi-megabyte payload must never reach the extraction engine (ReDoS /
+  // event-loop stall surface). Hard cap: 50,000 characters.
+  const RAW_TEXT_MAX = 50_000;
+  if (typeof rawText !== 'string' || rawText.length === 0) {
+    return res.status(400).json({ success: false, code: 'INVALID_PAYLOAD', message: 'rawText is required.' });
+  }
+  if (rawText.length > RAW_TEXT_MAX) {
+    return res.status(400).json({
+      success: false,
+      code: 'PAYLOAD_TOO_LARGE',
+      message: `rawText exceeds the ${RAW_TEXT_MAX}-character limit.`
+    });
+  }
+  if (typeof fileName === 'string' && fileName.length > 512) {
+    return res.status(400).json({ success: false, code: 'INVALID_PAYLOAD', message: 'fileName too long.' });
+  }
+
+  // SEC-011: a PATIENT token may only process documents into its OWN record.
+  if (!(await patientWritableByCaller(patientId, req.user!))) {
+    return forbidden(res, 'Patients may only process documents for their own record.');
+  }
 
   const pipelineResult = await OcrEngine.processDocument(documentId, patientId, fileName, rawText);
 
-  state.documentOcrResults.push(pipelineResult.ocrResult);
-  for (const ent of pipelineResult.entities) {
-    state.medicalEntities.push(ent);
-  }
-  db.save();
-
-  db.addAuditLog({
-    correlationId: 'OCR-PROC',
-    actorId: 'AI_OCR_ENGINE',
-    actorRole: 'SYSTEM_ADMIN',
-    action: 'DOCUMENT_OCR_PROCESSED',
-    resourceType: 'DOCUMENT',
-    resourceId: documentId,
-    details: { entitiesCount: pipelineResult.entities.length, confidence: pipelineResult.ocrResult.confidence },
-    ipAddress: req.ip || '127.0.0.1'
-  });
+  // Atomic: OCR result + all extracted entities + audit log in one tx.
+  await db.documents.saveOcrPipeline(
+    pipelineResult.ocrResult,
+    pipelineResult.entities,
+    {
+      documentId,
+      entitiesCount: pipelineResult.entities.length,
+      confidence: pipelineResult.ocrResult.confidence,
+      ipAddress: req.ip
+    }
+  );
 
   res.json(pipelineResult);
-});
+}));
 
-apiRouter.get('/entities/:patientId', (req, res) => {
-  const entities = db.getState().medicalEntities.filter(e => e.patientId === req.params.patientId);
-  res.json(entities);
-});
+apiRouter.get('/entities/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own entities.' });
+  }
+  res.json(await db.documents.entitiesByPatient(req.params.patientId));
+}));
 
-apiRouter.post('/entities/:id/verify', (req, res) => {
-  const state = db.getState();
-  const entity = state.medicalEntities.find(e => e.id === req.params.id);
-  if (!entity) return res.status(404).json({ message: 'Entity not found' });
-
-  entity.isVerified = true;
-  if (req.body.name) entity.name = req.body.name;
-  if (req.body.value) entity.value = req.body.value;
-  db.save();
-
-  res.json({ success: true, entity });
-});
-
-// 9. TIMELINE & ABDM
-apiRouter.get('/timeline/:patientId', (req, res) => {
-  const events = db.getState().timelineEvents.filter(t => t.patientId === req.params.patientId);
-  res.json(events);
-});
-
-apiRouter.get('/abdm/records/:patientId', (req, res) => {
-  const records = db.getState().abdmRecords.filter(r => r.patientId === req.params.patientId);
-  res.json(records);
-});
-
-apiRouter.get('/abdm/fhir/:patientId', (req, res) => {
-  const bundle = AbdmAdapter.generateFhirPatientBundle(req.params.patientId);
-  res.json(bundle);
-});
-
-// 10. AI STRUCTURED SUMMARY
-apiRouter.get('/ai-summary/:sessionId', (req, res) => {
-  const summary = db.getState().aiSummaries.find(s => s.sessionId === req.params.sessionId);
-  res.json(summary || null);
-});
-
-apiRouter.post('/ai-summary/generate', (req, res) => {
-  const { sessionId, patientId } = req.body;
-  const summary = SummaryEngine.generateSummary(sessionId, patientId);
-  res.json(summary);
-});
-
-apiRouter.post('/ai-summary/:id/verify', (req, res) => {
-  const state = db.getState();
-  const summary = state.aiSummaries.find(s => s.id === req.params.id);
-  if (!summary) return res.status(404).json({ message: 'Summary not found' });
-
-  summary.status = 'PHYSICIAN_VERIFIED';
-  summary.version = (summary.version || 1) + 1;
-  summary.physicianVerifiedAt = new Date().toISOString();
-  summary.verifiedByDoctorId = req.body.doctorId || 'USR-DOC-01';
-  summary.doctorNotes = req.body.doctorNotes || 'Physician review complete. History confirmed with patient.';
-
-  if (req.body.chiefComplaint) summary.chiefComplaint = req.body.chiefComplaint;
-  if (req.body.historyOfPresentIllness) summary.historyOfPresentIllness = req.body.historyOfPresentIllness;
-
-  db.save();
-
-  db.addAuditLog({
-    correlationId: 'SUM-VERIFY',
-    actorId: summary.verifiedByDoctorId || 'USR-DOC-01',
-    actorRole: 'DOCTOR',
-    action: 'PHYSICIAN_VERIFIED_AI_SUMMARY',
-    resourceType: 'AI_SUMMARY',
-    resourceId: summary.id,
-    details: { version: summary.version, notes: summary.doctorNotes },
-    ipAddress: req.ip || '127.0.0.1'
+apiRouter.post('/entities/:id/verify', requireAuth('DOCTOR', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
+  const entity = await db.documents.verifyEntity(req.params.id, {
+    name: req.body.name,
+    value: req.body.value
   });
+  if (!entity) return res.status(404).json({ message: 'Entity not found' });
+  res.json({ success: true, entity });
+}));
 
+// 9. TIMELINE & ABDM ----------------------------------------------------------------------
+apiRouter.get('/timeline/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own timeline.' });
+  }
+  res.json(await db.timeline.byPatient(req.params.patientId));
+}));
+
+apiRouter.get('/abdm/records/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own ABDM records.' });
+  }
+  res.json(await db.abdm.recordsByPatient(req.params.patientId));
+}));
+
+apiRouter.get('/abdm/fhir/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own FHIR bundle.' });
+  }
+  const bundle = await AbdmAdapter.generateFhirPatientBundle(req.params.patientId);
+  res.json(bundle);
+}));
+
+// 10. AI STRUCTURED SUMMARY -------------------------------------------------------------------
+apiRouter.get('/ai-summary/:sessionId', requireAuth(), wrap(async (req, res) => {
+  const summary = await db.summaries.bySession(req.params.sessionId);
+  // IDOR: a PATIENT token may only read summaries for its OWN sessions.
+  if (summary && req.user!.role === 'PATIENT' &&
+      !(await patientReadableByCaller(summary.patientId, req.user!))) {
+    return forbidden(res, 'Patients may only access their own summaries.');
+  }
+  res.json(summary || null);
+}));
+
+apiRouter.post('/ai-summary/generate', requireAuth(...ALL), wrap(async (req, res) => {
+  const { sessionId, patientId } = req.body;
+
+  // SEC-009: a PATIENT token may only generate summaries for its OWN record,
+  // and a known session must belong to the claimed patient (all roles).
+  if (!(await patientWritableByCaller(patientId, req.user!))) {
+    return forbidden(res, 'Patients may only generate summaries for their own record.');
+  }
+  const sessionOwner = await sessionPatientId(sessionId);
+  if (sessionOwner !== null && sessionOwner !== undefined && sessionOwner !== patientId) {
+    return forbidden(res, 'Clinical session does not belong to the claimed patient.');
+  }
+
+  const summary = await SummaryEngine.generateSummary(sessionId, patientId);
+  res.json(summary);
+}));
+
+apiRouter.post('/ai-summary/:id/verify', requireAuth('DOCTOR', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
+  const summary = await db.summaries.verify(req.params.id, {
+    doctorId: req.body.doctorId ?? req.user!.id,
+    doctorNotes: req.body.doctorNotes,
+    chiefComplaint: req.body.chiefComplaint,
+    historyOfPresentIllness: req.body.historyOfPresentIllness
+  });
+  if (!summary) return res.status(404).json({ message: 'Summary not found' });
   res.json({ success: true, summary });
-});
+}));
 
-// 11. TRIAGE ALERTS
-apiRouter.get('/triage/alerts', (req, res) => {
-  res.json(db.getState().redFlagAlerts);
-});
+// 11. TRIAGE ALERTS ------------------------------------------------------------------------------
+apiRouter.get('/triage/alerts', requireAuth(...STAFF_READ), wrap(async (_req, res) => {
+  res.json(await db.alerts.list());
+}));
 
-apiRouter.post('/triage/acknowledge/:id', (req, res) => {
-  const state = db.getState();
-  const alert = state.redFlagAlerts.find(a => a.id === req.params.id);
+apiRouter.post('/triage/acknowledge/:id', requireAuth('TRIAGE', 'ADMIN', 'SYSTEM_ADMIN'), wrap(async (req, res) => {
+  const alert = await db.alerts.acknowledge(req.params.id, {
+    acknowledgedBy: req.body.acknowledgedBy,
+    actionTaken: req.body.actionTaken
+  });
   if (!alert) return res.status(404).json({ message: 'Alert not found' });
-
-  alert.status = 'ACKNOWLEDGED';
-  alert.acknowledgedBy = req.body.acknowledgedBy || 'Sister Suniti Rao (Triage Nurse)';
-  alert.acknowledgedAt = new Date().toISOString();
-  alert.clinicalActionTaken = req.body.actionTaken || 'Patient prioritized in queue. Vitals checked.';
-  db.save();
-
-  db.broadcast('TRIAGE_ACKNOWLEDGED', alert);
   res.json({ success: true, alert });
-});
+}));
 
-// 12. CONSULTATION & PRESCRIPTION
-apiRouter.get('/consultations/:patientId', (req, res) => {
-  const state = db.getState();
-  const consultations = state.consultations.filter(c => c.patientId === req.params.patientId);
-  res.json(consultations);
-});
+// 12. CONSULTATION & PRESCRIPTION -------------------------------------------------------------------
+apiRouter.get('/consultations/:patientId', requireAuth(...STAFF_READ), wrap(async (req, res) => {
+  res.json(await db.consultations.byPatient(req.params.patientId));
+}));
 
-apiRouter.post('/consultations', (req, res) => {
-  const state = db.getState();
-  const consultation = {
-    id: 'CON-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-    startedAt: new Date().toISOString(),
-    status: 'IN_PROGRESS' as const,
-    ...req.body
-  };
-  state.consultations.push(consultation);
-  db.save();
+apiRouter.post('/consultations', requireAuth('DOCTOR', 'ADMIN'), wrap(async (req, res) => {
+  const consultation = await db.consultations.create(req.body);
   res.json(consultation);
-});
+}));
 
-apiRouter.post('/consultations/:id/finalize', async (req, res) => {
-  const state = db.getState();
-  const consultation = state.consultations.find(c => c.id === req.params.id) || {
+apiRouter.post('/consultations/:id/finalize', requireAuth('DOCTOR', 'ADMIN'), wrap(async (req, res) => {
+  const existing = (await db.consultations.byPatient(req.body.patientId || ''))
+    .find((c) => c.id === req.params.id);
+
+  const consultation = existing || {
     id: req.params.id,
-    appointmentId: req.body.appointmentId,
-    patientId: req.body.patientId,
+    appointmentId: req.body.appointmentId || '',
+    patientId: req.body.patientId || '',
     practitionerId: req.body.practitionerId || 'PRAC-01',
     aiSummaryId: req.body.aiSummaryId || 'SUM-HERO-01',
-    clinicalExamination: req.body.clinicalExamination || { generalAppearance: 'Conscious, oriented', vitals: { bp: '124/82 mmHg', pulse: '76 bpm', temp: '98.4 F', spo2: '99%', respRate: '16/min' }, systemicExam: 'Knee joints: Crepitus on flexion, no warm effusion' },
+    clinicalExamination: req.body.clinicalExamination || {
+      generalAppearance: 'Conscious, oriented',
+      vitals: { bp: '124/82 mmHg', pulse: '76 bpm', temp: '98.4 F', spo2: '99%', respRate: '16/min' },
+      systemicExam: 'Knee joints: Crepitus on flexion, no warm effusion'
+    },
     assessment: req.body.assessment || 'Janu Sandhivata (Bilateral Knee Osteoarthritis) with Mandagni',
-    finalDiagnosis: req.body.finalDiagnosis || [{ code: 'M17.0', name: 'Primary Bilateral Osteoarthritis of Knee', system: 'ICD11' }, { code: 'NAMASTE-AYU-042', name: 'Janu Sandhivata', system: 'NAMASTE_AYUSH' }],
+    finalDiagnosis: req.body.finalDiagnosis || [
+      { code: 'M17.0', name: 'Primary Bilateral Osteoarthritis of Knee', system: 'ICD11' },
+      { code: 'NAMASTE-AYU-042', name: 'Janu Sandhivata', system: 'NAMASTE_AYUSH' }
+    ],
     ayushChikitsaSutra: 'Vatahara, Shoolahara, Agni-Deepana & Rasayana Chikitsa',
     followUpDate: req.body.followUpDate || '2026-09-28',
-    dietLifestyleAdvice: req.body.dietLifestyleAdvice || ['Avoid cold and dry items', 'Daily mild warm oil massage (Mahanarayana Taila)', 'Avoid squatting on floor'],
+    dietLifestyleAdvice: req.body.dietLifestyleAdvice || [
+      'Avoid cold and dry items',
+      'Daily mild warm oil massage (Mahanarayana Taila)',
+      'Avoid squatting on floor'
+    ],
     status: 'FINALIZED' as const,
     startedAt: new Date().toISOString(),
     finalizedAt: new Date().toISOString()
-  };
+  } as any;
 
-  if (!state.consultations.find(c => c.id === consultation.id)) {
-    state.consultations.push(consultation);
-  } else {
-    consultation.status = 'FINALIZED';
-    consultation.finalizedAt = new Date().toISOString();
-  }
+  // Atomic: consultation upsert + prescription items + audit log.
+  const finalized = await db.consultations.finalize(
+    consultation,
+    Array.isArray(req.body.prescriptions) ? req.body.prescriptions : [],
+    { ipAddress: req.ip }
+  );
 
-  // Save prescriptions
-  if (req.body.prescriptions && Array.isArray(req.body.prescriptions)) {
-    for (const rx of req.body.prescriptions) {
-      state.prescriptions.push({
-        id: 'RX-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
-        consultationId: consultation.id,
-        ...rx
-      });
-    }
-  }
-
-  // Sync to HIS EMR Gateway
+  // Sync to HIS EMR Gateway AFTER the clinical data is safely committed.
   await HisAdapter.syncPreIntakeEncounter({
-    encounterId: consultation.id,
-    patientId: consultation.patientId,
-    practitionerId: consultation.practitionerId,
+    encounterId: finalized.id,
+    patientId: finalized.patientId,
+    practitionerId: finalized.practitionerId,
     departmentId: 'DEP-01',
-    chiefComplaint: consultation.assessment,
-    aiSummaryId: consultation.aiSummaryId,
+    chiefComplaint: finalized.assessment,
+    aiSummaryId: finalized.aiSummaryId,
     intakeTimestamp: new Date().toISOString()
   });
 
-  db.save();
+  res.json({ success: true, consultation: finalized });
+}));
 
-  db.addAuditLog({
-    correlationId: 'CON-FINAL',
-    actorId: consultation.practitionerId,
-    actorRole: 'DOCTOR',
-    action: 'CONSULTATION_FINALIZED',
-    resourceType: 'CONSULTATION',
-    resourceId: consultation.id,
-    details: { diagnosis: consultation.finalDiagnosis, prescriptionsCount: req.body.prescriptions?.length || 0 },
-    ipAddress: req.ip || '127.0.0.1'
-  });
+// 13. NOTIFICATIONS, AUDIT & SYSTEM HEALTH ------------------------------------------------------------
+apiRouter.get('/notifications/:patientId', requireAuth(), wrap(async (req, res) => {
+  if (!(await patientReadableByCaller(req.params.patientId, req.user!))) {
+    return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Patients may only access their own notifications.' });
+  }
+  res.json(await db.notifications.byPatient(req.params.patientId));
+}));
 
-  res.json({ success: true, consultation });
-});
+apiRouter.get('/audit/logs', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
+  res.json(await db.auditLogs.list());
+}));
 
-// 13. NOTIFICATIONS, AUDIT & SYSTEM HEALTH
-apiRouter.get('/notifications/:patientId', (req, res) => {
-  const notifs = db.getState().notifications.filter(n => n.patientId === req.params.patientId);
-  res.json(notifs);
-});
+apiRouter.get('/system/health', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
+  res.json(await db.systemHealth.list());
+}));
 
-apiRouter.get('/audit/logs', (req, res) => {
-  res.json(db.getState().auditLogs);
-});
+apiRouter.get('/integrations/events', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
+  res.json(await db.integrationEvents.list());
+}));
 
-apiRouter.get('/system/health', (req, res) => {
-  res.json(db.getState().systemHealth);
-});
-
-apiRouter.get('/integrations/events', (req, res) => {
-  res.json(db.getState().integrationEvents);
-});
-
-// 14. DEMO CONTROL CENTER
-apiRouter.post('/demo/reset', (req, res) => {
-  seedDatabase(true);
+// 14. DEMO CONTROL CENTER (SEC-010: SYSTEM_ADMIN-only, and fully disabled in
+//     production unless explicitly re-enabled via ENABLE_DEMO_RESET=true).
+//     Rationale: this route TRUNCATEs every clinical table — exposing it to
+//     lower-privileged roles was a one-request hospital-wide data wipe.
+apiRouter.post('/demo/reset', requireAuth('SYSTEM_ADMIN'), wrap(async (_req, res) => {
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_DEMO_RESET !== 'true') {
+    return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'Demo reset is disabled in production.' });
+  }
+  await seedDatabase(true);
   res.json({ success: true, message: 'MediKiosk demo environment reset to pristine initial state.' });
-});
+}));
 
-apiRouter.get('/demo/state', (req, res) => {
-  res.json(db.getState());
+// Full-database snapshot (all patients' PHI) — admin-only surface.
+apiRouter.get('/demo/state', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
+  const state = await db.snapshot();
+  // Never expose credential hashes, even to admins (not needed here).
+  res.json({ ...state, users: state.users.map(({ passwordHash: _ph, ...u }) => u) });
+}));
+
+// Centralized error handler — no stack traces leak to clients.
+apiRouter.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[API] Unhandled error:', err);
+  res.status(500).json({ success: false, code: 'INTERNAL_ERROR', message: 'Internal server error.' });
 });

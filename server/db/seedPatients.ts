@@ -7,6 +7,9 @@ export const seededPatients: Patient[] = [
   // 1. HERO DEMO PATIENT
   {
     id: 'PAT-HERO-01',
+    // Linked portal account (USR-PAT-01 / username: patient) — used by the
+    // API to enforce that a PATIENT token may only read its own record.
+    userId: 'USR-PAT-01',
     mkPatientId: 'MK-PAT-2026-000124',
     abhaNumber: '91-4829-1029-4821',
     abhaAddress: 'radha.sharma@abdm',

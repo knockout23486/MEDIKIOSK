@@ -1,15 +1,16 @@
-import { db } from '../db/store.js';
+import { db, genId } from '../db/store.js';
 import { AiSummary, ProvenanceSource } from '../db/schema.js';
 import { FusionEngine } from './fusionEngine.js';
 
 export class SummaryEngine {
-  public static generateSummary(sessionId: string, patientId: string): AiSummary {
-    const state = db.getState();
-    const patient = state.patients.find(p => p.id === patientId);
-    const session = state.clinicalSessions.find(s => s.id === sessionId);
-    const answers = state.clinicalAnswers.filter(a => a.sessionId === sessionId);
-    const ayush = state.ayushAssessments.find(a => a.sessionId === sessionId);
-    const fusion = FusionEngine.fusePatientData(sessionId, patientId);
+  public static async generateSummary(sessionId: string, patientId: string): Promise<AiSummary> {
+    const [patient, session, answers, ayush, fusion] = await Promise.all([
+      db.patients.get(patientId),
+      db.clinical.getSession(sessionId),
+      db.clinical.answersBySession(sessionId),
+      db.clinical.ayushBySession(sessionId),
+      FusionEngine.fusePatientData(sessionId, patientId)
+    ]);
 
     const cc = session?.chiefComplaint || (answers.length > 0 ? answers[0].answerText : 'Joint discomfort and routine OPD intake');
     const age = patient?.age || 58;
@@ -20,7 +21,7 @@ export class SummaryEngine {
     const hpi = `Patient reports insidious onset of bilateral knee discomfort for the past 6 months. Symptoms are characterized by deep aching and morning stiffness lasting ~30-45 minutes. Aggravated by cold weather, climbing stairs, and prolonged standing. Partially relieved by warm oil application and rest. Associated with audible crepitus during bending.`;
 
     const summary: AiSummary = {
-      id: 'SUM-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      id: genId('SUM-'), // UUID-based (SEC-015)
       sessionId,
       patientId,
       version: 1,
@@ -77,21 +78,7 @@ export class SummaryEngine {
       createdAt: new Date().toISOString()
     };
 
-    // Save summary to database state
-    state.aiSummaries.unshift(summary);
-    db.save();
-
-    db.addAuditLog({
-      correlationId: 'CORR-SUM-' + summary.id,
-      actorId: 'CLINICAL_SUMMARY_ENGINE',
-      actorRole: 'SYSTEM_ADMIN',
-      action: 'AI_STRUCTURED_SUMMARY_GENERATED',
-      resourceType: 'AI_SUMMARY',
-      resourceId: summary.id,
-      details: { version: 1, status: 'DRAFT_AI', confidence: 0.95 },
-      ipAddress: '127.0.0.1'
-    });
-
-    return summary;
+    // Persist the summary + audit entry in one SQL transaction.
+    return db.summaries.create(summary);
   }
 }

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { api } from '../services/api.js';
 
 interface DemoContextType {
   activePatientId: string;
@@ -41,7 +42,9 @@ export const DemoProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetDemoData = async () => {
     try {
-      await fetch('/api/demo/reset', { method: 'POST' });
+      const res = await api.resetDemo();
+      // Demo reset is SYSTEM_ADMIN-only on the API; skip local reset if refused.
+      if (res && (res as any).success !== true) return;
       setActivePatientId('PAT-HERO-01');
       setActiveSessionId('SES-HERO-01');
       setActiveAppointmentId('APT-001');

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { NotificationItem, RedFlagAlert } from '../types/index.js';
+import { api, getAuthToken } from '../services/api.js';
+import { useAuth } from './AuthContext.js';
 
 interface NotificationContextType {
   notifications: NotificationItem[];
@@ -21,6 +23,10 @@ interface ToastMessage {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Clinical alerts are staff-only data (SEC-003 RBAC) — poll them only when
+  // the active session holds a clinical role.
+  const { role } = useAuth();
+  const isStaff = role === 'TRIAGE' || role === 'DOCTOR' || role === 'ADMIN' || role === 'SYSTEM_ADMIN';
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [liveTriageAlerts, setLiveTriageAlerts] = useState<RedFlagAlert[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -36,23 +42,26 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   useEffect(() => {
-    // Initial fetch of notifications
-    fetch('/api/notifications/PAT-HERO-01')
-      .then(res => res.json())
+    if (!getAuthToken()) return; // wait until the kiosk session token exists
+
+    // Initial fetch of notifications (authenticated)
+    api.getNotifications('PAT-HERO-01')
       .then(data => {
         if (Array.isArray(data)) setNotifications(data);
       })
       .catch(() => {});
 
-    fetch('/api/triage/alerts')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setLiveTriageAlerts(data);
-      })
-      .catch(() => {});
+    if (isStaff) {
+      api.getTriageAlerts()
+        .then(data => {
+          if (Array.isArray(data)) setLiveTriageAlerts(data);
+        })
+        .catch(() => {});
+    }
 
-    // Connect to Server-Sent Events stream
-    const eventSource = new EventSource('/api/events');
+    // Connect to Server-Sent Events stream (token via query param — EventSource
+    // cannot set Authorization headers).
+    const eventSource = new EventSource(`/api/events?token=${encodeURIComponent(getAuthToken() || '')}`);
 
     eventSource.addEventListener('NEW_NOTIFICATION', (e: any) => {
       try {

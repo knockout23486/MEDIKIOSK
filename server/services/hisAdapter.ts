@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { db } from '../db/store.js';
 
 export interface HisEncounterSyncPayload {
@@ -17,7 +18,7 @@ export class HisAdapter {
     syncedAt: string;
   }> {
     const startTime = Date.now();
-    const hisEncounterRef = 'AIIA-HIS-ENC-' + Math.floor(100000 + Math.random() * 900000);
+    const hisEncounterRef = 'AIIA-HIS-ENC-' + randomUUID().slice(0, 8).toUpperCase();
 
     const fhirEncounter = {
       resourceType: 'Encounter',
@@ -42,8 +43,8 @@ export class HisAdapter {
       }
     };
 
-    // Log integration roundtrip
-    db.addIntegrationEvent({
+    // Log integration roundtrip (SQL insert)
+    await db.addIntegrationEvent({
       integrationType: 'HIS_EMR',
       direction: 'OUTBOUND',
       endpoint: 'https://his-demo.aiia.gov.in/api/v2/opd/encounter-preintake',

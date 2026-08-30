@@ -1,3 +1,59 @@
+// ============================================================================
+// MediKiosk Data Layer — Relational Schema (PostgreSQL via Drizzle ORM)
+// ----------------------------------------------------------------------------
+// SEC-001 remediation: the platform previously persisted all clinical data to
+// a flat JSON file. It now uses a proper RDBMS. This module defines BOTH:
+//   1. The canonical TypeScript domain models (unchanged shape — the API
+//      contract used by the React client stays byte-compatible).
+//   2. The physical PostgreSQL tables (snake_case columns, jsonb for nested
+//      clinical structures, timestamptz for instants, date for calendar days).
+// ============================================================================
+import {
+  pgTable, varchar, text, integer, boolean, doublePrecision, jsonb, index,
+  uniqueIndex, pgSequence, customType
+} from 'drizzle-orm/pg-core';
+import { encryptedText, encryptedJson } from './crypto.js';
+
+// Timestamp-with-time-zone column. SQL stores `timestamptz`; the application
+// layer exchanges ISO-8601 strings (UTC) so the wire format is unchanged.
+// The driver may hand back a Date object or a raw 'YYYY-MM-DD HH:MM:SS+TZ'
+// string depending on parser configuration — normalize both.
+export const tstz = customType<{ data: string; driverData: Date | string }>({
+  dataType: () => 'timestamp with time zone',
+  toDriver(value: string): Date {
+    return new Date(value);
+  },
+  fromDriver(value: Date | string): string {
+    if (value instanceof Date) return value.toISOString();
+    // Normalize '2026-08-20 08:30:00+00' / '...+05:30' / '...Z' → ISO UTC.
+    let s = value.trim().replace(' ', 'T');
+    const offset = s.match(/([+-])(\d{2})(?::?(\d{2}))?$/);
+    if (offset && offset.index !== undefined) {
+      const offsetMinutes = (offset[1] === '-' ? -1 : 1) * (Number(offset[2]) * 60 + Number(offset[3] ?? 0));
+      const asUtc = new Date(s.slice(0, offset.index) + 'Z');
+      return new Date(asUtc.getTime() - offsetMinutes * 60_000).toISOString();
+    }
+    return new Date(s.endsWith('Z') ? s : s + 'Z').toISOString();
+  }
+});
+
+// Calendar-date column (DOB, slot date, follow-up...). SQL stores `date`;
+// the application layer exchanges plain 'YYYY-MM-DD' strings.
+export const dateStr = customType<{ data: string; driverData: string | Date }>({
+  dataType: () => 'date',
+  toDriver(value: string): string {
+    return value;
+  },
+  fromDriver(value: string | Date): string {
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    return value.slice(0, 10);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// DOMAIN MODELS (API contract — unchanged)
+// ---------------------------------------------------------------------------
+
 export type UserRole = 'PATIENT' | 'DOCTOR' | 'TRIAGE' | 'ADMIN' | 'SYSTEM_ADMIN';
 
 export interface User {
@@ -14,6 +70,8 @@ export interface User {
 
 export interface Patient {
   id: string;
+  /** Owning portal user (demo kiosk account) — drives record-level access. */
+  userId?: string;
   mkPatientId: string; // e.g. MK-PAT-2026-000124
   abhaNumber: string; // e.g. 91-4829-1029-4821
   abhaAddress: string; // e.g. radha.sharma@abdm
@@ -131,12 +189,12 @@ export interface ClinicalSession {
   redFlagTriggered: boolean;
 }
 
-export type ProvenanceSource = 
-  | 'PATIENT_VOICE' 
-  | 'PATIENT_TOUCH' 
-  | 'OCR_DOCUMENT' 
-  | 'ABDM_FHIR' 
-  | 'AI_INFERENCE' 
+export type ProvenanceSource =
+  | 'PATIENT_VOICE'
+  | 'PATIENT_TOUCH'
+  | 'OCR_DOCUMENT'
+  | 'ABDM_FHIR'
+  | 'AI_INFERENCE'
   | 'PHYSICIAN';
 
 export interface ClinicalAnswer {
@@ -409,3 +467,411 @@ export interface SystemHealthStatus {
   lastCheck: string;
   notes: string;
 }
+
+// ---------------------------------------------------------------------------
+// POSTGRESQL SEQUENCES
+// Human-readable business identifiers (MK-PAT-2026-000129, A-100, ...) are
+// allocated from database sequences so that concurrent registrations can never
+// collide or duplicate identifiers (see SEC-001 regression test).
+// ---------------------------------------------------------------------------
+export const mkPatientIdSeq = pgSequence('mk_patient_id_seq');
+export const appointmentNumberSeq = pgSequence('appointment_number_seq');
+export const queueTokenNumberSeq = pgSequence('queue_token_number_seq');
+/** Emergency (red-flag) triage tokens — EMERG-####, sequence-allocated. */
+export const emergTokenSeq = pgSequence('emerg_token_seq');
+
+// ---------------------------------------------------------------------------
+// POSTGRESQL TABLES
+// ---------------------------------------------------------------------------
+
+export const users = pgTable('users', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  username: varchar('username', { length: 128 }).notNull().unique(),
+  passwordHash: varchar('password_hash', { length: 512 }).notNull(),
+  role: varchar('role', { length: 32 }).$type<UserRole>().notNull(),
+  name: varchar('name', { length: 256 }).notNull(),
+  email: varchar('email', { length: 320 }).notNull(),
+  phone: varchar('phone', { length: 32 }).notNull(),
+  avatarUrl: text('avatar_url'),
+  createdAt: tstz('created_at').notNull()
+});
+
+export const patients = pgTable('patients', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  mkPatientId: varchar('mk_patient_id', { length: 64 }).notNull().unique(),
+  // Ownership link to the portal user (kiosk demo account). Used to enforce
+  // record-level access: a PATIENT token may only read its own record.
+  userId: varchar('user_id', { length: 64 }),
+  // Direct identifiers are application-encrypted (AES-256-GCM) before they
+  // reach PostgreSQL — see server/db/crypto.ts (SEC-004).
+  abhaNumber: encryptedText('abha_number').notNull(),
+  abhaAddress: encryptedText('abha_address').notNull(),
+  name: encryptedText('name').notNull(),
+  age: integer('age').notNull(),
+  dob: dateStr('dob').notNull(),
+  gender: varchar('gender', { length: 16 }).$type<Patient['gender']>().notNull(),
+  phone: encryptedText('phone').notNull(),
+  address: encryptedText('address').notNull(),
+  emergencyContact: encryptedJson<Patient['emergencyContact']>()('emergency_contact').notNull(),
+  language: varchar('language', { length: 16 }).notNull(),
+  accessibilityNeeds: encryptedJson<string[]>()('accessibility_needs'),
+  isDemo: boolean('is_demo').notNull().default(false),
+  registeredAt: tstz('registered_at').notNull()
+}, (table) => [
+  index('patients_user_idx').on(table.userId)
+]);
+
+export const consents = pgTable('consents', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  patientId: varchar('patient_id', { length: 64 }).notNull().unique(),
+  version: varchar('version', { length: 32 }).notNull(),
+  purposes: encryptedJson<Consent['purposes']>()('purposes').notNull(),
+  status: varchar('status', { length: 32 }).$type<Consent['status']>().notNull(),
+  grantedAt: tstz('granted_at').notNull(),
+  ipAddress: varchar('ip_address', { length: 64 }).notNull(),
+  signatureType: varchar('signature_type', { length: 32 }).$type<Consent['signatureType']>().notNull()
+});
+
+export const hospitals = pgTable('hospitals', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  name: varchar('name', { length: 256 }).notNull(),
+  code: varchar('code', { length: 32 }).notNull().unique(),
+  type: varchar('type', { length: 32 }).$type<Hospital['type']>().notNull(),
+  address: text('address').notNull(),
+  phone: varchar('phone', { length: 32 }).notNull(),
+  activeOpdCount: integer('active_opd_count').notNull(),
+  currentQueueLength: integer('current_queue_length').notNull()
+});
+
+export const departments = pgTable('departments', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  hospitalId: varchar('hospital_id', { length: 64 }).notNull(),
+  name: varchar('name', { length: 256 }).notNull(),
+  code: varchar('code', { length: 32 }).notNull(),
+  isAyush: boolean('is_ayush').notNull(),
+  ayushBranch: varchar('ayush_branch', { length: 32 }).$type<NonNullable<Department['ayushBranch']>>(),
+  description: encryptedText('description').notNull(),
+  iconName: varchar('icon_name', { length: 64 }).notNull()
+});
+
+export const practitioners = pgTable('practitioners', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  userId: varchar('user_id', { length: 64 }).notNull(),
+  hospitalId: varchar('hospital_id', { length: 64 }).notNull(),
+  departmentId: varchar('department_id', { length: 64 }).notNull(),
+  name: varchar('name', { length: 256 }).notNull(),
+  title: varchar('title', { length: 64 }).notNull(),
+  specialty: varchar('specialty', { length: 128 }).notNull(),
+  qualifications: varchar('qualifications', { length: 256 }).notNull(),
+  roomNumber: varchar('room_number', { length: 32 }).notNull(),
+  experienceYears: integer('experience_years').notNull(),
+  opdTiming: varchar('opd_timing', { length: 64 }).notNull(),
+  isAvailable: boolean('is_available').notNull(),
+  avgConsultationMins: integer('avg_consultation_mins').notNull(),
+  activeQueueCount: integer('active_queue_count').notNull()
+});
+
+export const appointments = pgTable('appointments', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  appointmentNumber: varchar('appointment_number', { length: 64 }).notNull().unique(),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  practitionerId: varchar('practitioner_id', { length: 64 }).notNull(),
+  departmentId: varchar('department_id', { length: 64 }).notNull(),
+  hospitalId: varchar('hospital_id', { length: 64 }).notNull(),
+  slotDate: dateStr('slot_date').notNull(),
+  slotTime: varchar('slot_time', { length: 32 }).notNull(),
+  status: varchar('status', { length: 32 }).$type<Appointment['status']>().notNull(),
+  bookedAt: tstz('booked_at').notNull()
+}, (table) => [
+  index('appointments_patient_idx').on(table.patientId),
+  index('appointments_practitioner_idx').on(table.practitionerId)
+]);
+
+export const queueTokens = pgTable('queue_tokens', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  tokenNumber: varchar('token_number', { length: 32 }).notNull().unique(),
+  appointmentId: varchar('appointment_id', { length: 64 }).notNull(),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  practitionerId: varchar('practitioner_id', { length: 64 }).notNull(),
+  status: varchar('status', { length: 32 }).$type<QueueToken['status']>().notNull(),
+  priority: varchar('priority', { length: 16 }).$type<QueueToken['priority']>().notNull(),
+  estimatedWaitMins: integer('estimated_wait_mins').notNull(),
+  checkInTime: tstz('check_in_time').notNull(),
+  calledTime: tstz('called_time'),
+  completedTime: tstz('completed_time')
+}, (table) => [
+  index('queue_tokens_practitioner_status_idx').on(table.practitionerId, table.status)
+]);
+
+export const clinicalSessions = pgTable('clinical_sessions', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  appointmentId: varchar('appointment_id', { length: 64 }).notNull(),
+  departmentId: varchar('department_id', { length: 64 }).notNull(),
+  isAyush: boolean('is_ayush').notNull(),
+  status: varchar('status', { length: 32 }).$type<ClinicalSession['status']>().notNull(),
+  chiefComplaint: text('chief_complaint').notNull(),
+  startedAt: tstz('started_at').notNull(),
+  completedAt: tstz('completed_at'),
+  redFlagTriggered: boolean('red_flag_triggered').notNull().default(false)
+}, (table) => [
+  index('clinical_sessions_patient_idx').on(table.patientId)
+]);
+
+export const clinicalAnswers = pgTable('clinical_answers', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  sessionId: varchar('session_id', { length: 64 }).notNull(),
+  questionId: varchar('question_id', { length: 128 }).notNull(),
+  questionText: encryptedText('question_text').notNull(),
+  answerText: encryptedText('answer_text').notNull(),
+  inputMode: varchar('input_mode', { length: 16 }).$type<ClinicalAnswer['inputMode']>().notNull(),
+  voiceTranscript: encryptedText('voice_transcript'),
+  confidence: doublePrecision('confidence').notNull(),
+  redFlagFlagged: boolean('red_flag_flagged').notNull().default(false),
+  provenance: varchar('provenance', { length: 32 }).$type<ProvenanceSource>().notNull(),
+  timestamp: tstz('timestamp').notNull()
+}, (table) => [
+  index('clinical_answers_session_idx').on(table.sessionId)
+]);
+
+export const ayushAssessments = pgTable('ayush_assessments', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  sessionId: varchar('session_id', { length: 64 }).notNull(),
+  prakriti: jsonb('prakriti').$type<AyushAssessment['prakriti']>().notNull(),
+  vikriti: jsonb('vikriti').$type<AyushAssessment['vikriti']>().notNull(),
+  dashavidha: jsonb('dashavidha').$type<AyushAssessment['dashavidha']>().notNull(),
+  agni: varchar('agni', { length: 32 }).$type<AyushAssessment['agni']>().notNull(),
+  koshtha: varchar('koshtha', { length: 32 }).$type<AyushAssessment['koshtha']>().notNull(),
+  ahara: text('ahara').notNull(),
+  vihara: text('vihara').notNull(),
+  nidana: jsonb('nidana').$type<string[]>().notNull(),
+  sampraptiSummary: text('samprapti_summary')
+});
+
+export const medicalDocuments = pgTable('medical_documents', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  fileName: varchar('file_name', { length: 512 }).notNull(),
+  fileType: varchar('file_type', { length: 32 }).$type<MedicalDocument['fileType']>().notNull(),
+  fileSize: integer('file_size').notNull(),
+  fileUrl: text('file_url').notNull(),
+  thumbnailUrl: text('thumbnail_url'),
+  uploadedAt: tstz('uploaded_at').notNull(),
+  isDemo: boolean('is_demo').notNull().default(false),
+  status: varchar('status', { length: 32 }).$type<MedicalDocument['status']>().notNull()
+}, (table) => [
+  index('medical_documents_patient_idx').on(table.patientId)
+]);
+
+export const documentOcrResults = pgTable('document_ocr_results', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  documentId: varchar('document_id', { length: 64 }).notNull(),
+  rawText: text('raw_text').notNull(),
+  confidence: doublePrecision('confidence').notNull(),
+  processingTimeMs: integer('processing_time_ms').notNull(),
+  extractedAt: tstz('extracted_at').notNull()
+});
+
+export const medicalEntities = pgTable('medical_entities', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  documentId: varchar('document_id', { length: 64 }),
+  sessionId: varchar('session_id', { length: 64 }),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  entityType: varchar('entity_type', { length: 32 }).$type<MedicalEntity['entityType']>().notNull(),
+  name: varchar('name', { length: 256 }).notNull(),
+  value: varchar('value', { length: 256 }),
+  unit: varchar('unit', { length: 64 }),
+  dosage: varchar('dosage', { length: 128 }),
+  frequency: varchar('frequency', { length: 128 }),
+  route: varchar('route', { length: 64 }),
+  duration: varchar('duration', { length: 64 }),
+  referenceRange: varchar('reference_range', { length: 128 }),
+  isAbnormal: boolean('is_abnormal'),
+  abnormalDirection: varchar('abnormal_direction', { length: 16 }).$type<NonNullable<MedicalEntity['abnormalDirection']>>(),
+  confidence: doublePrecision('confidence').notNull(),
+  sourceTextSnippet: encryptedText('source_text_snippet').notNull(),
+  provenance: varchar('provenance', { length: 32 }).$type<ProvenanceSource>().notNull(),
+  isVerified: boolean('is_verified').notNull().default(false),
+  verifiedByDoctor: varchar('verified_by_doctor', { length: 128 })
+}, (table) => [
+  index('medical_entities_patient_idx').on(table.patientId),
+  index('medical_entities_document_idx').on(table.documentId)
+]);
+
+export const timelineEvents = pgTable('timeline_events', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  date: dateStr('date').notNull(),
+  title: varchar('title', { length: 256 }).notNull(),
+  category: varchar('category', { length: 32 }).$type<TimelineEvent['category']>().notNull(),
+  institution: varchar('institution', { length: 256 }).notNull(),
+  description: encryptedText('description').notNull(),
+  keyEntities: jsonb('key_entities').$type<string[]>().notNull(),
+  documentId: varchar('document_id', { length: 64 }),
+  provenance: varchar('provenance', { length: 32 }).$type<ProvenanceSource>().notNull()
+}, (table) => [
+  index('timeline_events_patient_idx').on(table.patientId)
+]);
+
+export const abdmRecords = pgTable('abdm_records', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  resourceType: varchar('resource_type', { length: 64 }).$type<AbdmRecord['resourceType']>().notNull(),
+  fhirJson: encryptedJson<Record<string, any>>()('fhir_json').notNull(),
+  hipName: varchar('hip_name', { length: 256 }).notNull(),
+  hipId: varchar('hip_id', { length: 128 }).notNull(),
+  recordDate: dateStr('record_date').notNull(),
+  isSimulated: boolean('is_simulated').notNull()
+}, (table) => [
+  index('abdm_records_patient_idx').on(table.patientId)
+]);
+
+export const aiSummaries = pgTable('ai_summaries', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  sessionId: varchar('session_id', { length: 64 }).notNull(),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  version: integer('version').notNull().default(1),
+  status: varchar('status', { length: 32 }).$type<AiSummary['status']>().notNull(),
+  patientSnapshot: encryptedText('patient_snapshot').notNull(),
+  chiefComplaint: text('chief_complaint').notNull(),
+  historyOfPresentIllness: text('history_of_present_illness').notNull(),
+  relevantPastHistory: jsonb('relevant_past_history').$type<string[]>().notNull(),
+  surgicalHistory: jsonb('surgical_history').$type<string[]>().notNull(),
+  medicationHistory: jsonb('medication_history').$type<AiSummary['medicationHistory']>().notNull(),
+  allergies: jsonb('allergies').$type<AiSummary['allergies']>().notNull(),
+  familyHistory: jsonb('family_history').$type<string[]>().notNull(),
+  personalHistory: jsonb('personal_history').$type<AiSummary['personalHistory']>().notNull(),
+  reviewOfSystems: jsonb('review_of_systems').$type<Record<string, string>>().notNull(),
+  previousInvestigations: jsonb('previous_investigations').$type<AiSummary['previousInvestigations']>().notNull(),
+  ayushAssessmentSummary: text('ayush_assessment_summary'),
+  redFlagsDetected: jsonb('red_flags_detected').$type<string[]>().notNull(),
+  missingInformation: jsonb('missing_information').$type<string[]>().notNull(),
+  confidenceOverall: doublePrecision('confidence_overall').notNull(),
+  provenanceSummary: jsonb('provenance_summary').$type<AiSummary['provenanceSummary']>().notNull(),
+  createdAt: tstz('created_at').notNull(),
+  physicianVerifiedAt: tstz('physician_verified_at'),
+  verifiedByDoctorId: varchar('verified_by_doctor_id', { length: 128 }),
+  doctorNotes: text('doctor_notes')
+}, (table) => [
+  index('ai_summaries_session_idx').on(table.sessionId)
+]);
+
+export const redFlagAlerts = pgTable('red_flag_alerts', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  sessionId: varchar('session_id', { length: 64 }).notNull(),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  tokenNumber: varchar('token_number', { length: 32 }).notNull(),
+  patientName: encryptedText('patient_name').notNull(),
+  age: integer('age').notNull(),
+  gender: varchar('gender', { length: 16 }).notNull(),
+  triggerRule: varchar('trigger_rule', { length: 128 }).notNull(),
+  triggerInput: encryptedText('trigger_input').notNull(),
+  severity: varchar('severity', { length: 32 }).$type<RedFlagAlert['severity']>().notNull(),
+  detectedAt: tstz('detected_at').notNull(),
+  status: varchar('status', { length: 32 }).$type<RedFlagAlert['status']>().notNull(),
+  acknowledgedBy: varchar('acknowledged_by', { length: 256 }),
+  acknowledgedAt: tstz('acknowledged_at'),
+  clinicalActionTaken: text('clinical_action_taken')
+}, (table) => [
+  index('red_flag_alerts_status_idx').on(table.status)
+]);
+
+export const consultations = pgTable('consultations', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  appointmentId: varchar('appointment_id', { length: 64 }).notNull(),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  practitionerId: varchar('practitioner_id', { length: 64 }).notNull(),
+  aiSummaryId: varchar('ai_summary_id', { length: 64 }).notNull(),
+  clinicalExamination: encryptedJson<Consultation['clinicalExamination']>()('clinical_examination').notNull(),
+  assessment: text('assessment').notNull(),
+  finalDiagnosis: jsonb('final_diagnosis').$type<Consultation['finalDiagnosis']>().notNull(),
+  ayushChikitsaSutra: text('ayush_chikitsa_sutra'),
+  followUpDate: dateStr('follow_up_date').notNull(),
+  dietLifestyleAdvice: jsonb('diet_lifestyle_advice').$type<string[]>().notNull(),
+  status: varchar('status', { length: 32 }).$type<Consultation['status']>().notNull(),
+  startedAt: tstz('started_at').notNull(),
+  finalizedAt: tstz('finalized_at')
+}, (table) => [
+  index('consultations_patient_idx').on(table.patientId)
+]);
+
+export const prescriptionItems = pgTable('prescription_items', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  consultationId: varchar('consultation_id', { length: 64 }).notNull(),
+  medicineName: varchar('medicine_name', { length: 256 }).notNull(),
+  type: varchar('type', { length: 32 }).$type<PrescriptionItem['type']>().notNull(),
+  form: varchar('form', { length: 32 }).$type<PrescriptionItem['form']>().notNull(),
+  dosage: varchar('dosage', { length: 128 }).notNull(),
+  frequency: varchar('frequency', { length: 128 }).notNull(),
+  durationDays: integer('duration_days').notNull(),
+  anupana: varchar('anupana', { length: 128 }),
+  instructions: text('instructions').notNull()
+}, (table) => [
+  index('prescription_items_consultation_idx').on(table.consultationId)
+]);
+
+export const investigationOrders = pgTable('investigation_orders', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  consultationId: varchar('consultation_id', { length: 64 }).notNull(),
+  testName: varchar('test_name', { length: 256 }).notNull(),
+  category: varchar('category', { length: 32 }).$type<InvestigationOrder['category']>().notNull(),
+  priority: varchar('priority', { length: 16 }).$type<InvestigationOrder['priority']>().notNull(),
+  instructions: text('instructions').notNull(),
+  status: varchar('status', { length: 32 }).$type<InvestigationOrder['status']>().notNull()
+});
+
+export const notifications = pgTable('notifications', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  patientId: varchar('patient_id', { length: 64 }).notNull(),
+  channel: varchar('channel', { length: 16 }).$type<NotificationItem['channel']>().notNull(),
+  title: varchar('title', { length: 256 }).notNull(),
+  message: encryptedText('message').notNull(),
+  timestamp: tstz('timestamp').notNull(),
+  status: varchar('status', { length: 32 }).$type<NotificationItem['status']>().notNull()
+}, (table) => [
+  index('notifications_patient_idx').on(table.patientId)
+]);
+
+export const integrationEvents = pgTable('integration_events', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  integrationType: varchar('integration_type', { length: 32 }).$type<IntegrationEvent['integrationType']>().notNull(),
+  direction: varchar('direction', { length: 16 }).$type<IntegrationEvent['direction']>().notNull(),
+  endpoint: text('endpoint').notNull(),
+  status: varchar('status', { length: 32 }).$type<IntegrationEvent['status']>().notNull(),
+  latencyMs: integer('latency_ms').notNull(),
+  payload: jsonb('payload').$type<Record<string, any>>().notNull(),
+  response: jsonb('response').$type<Record<string, any>>().notNull(),
+  timestamp: tstz('timestamp').notNull()
+});
+
+export const auditLogs = pgTable('audit_logs', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  correlationId: varchar('correlation_id', { length: 128 }).notNull(),
+  actorId: varchar('actor_id', { length: 128 }).notNull(),
+  actorRole: varchar('actor_role', { length: 32 }).$type<UserRole>().notNull(),
+  action: varchar('action', { length: 128 }).notNull(),
+  resourceType: varchar('resource_type', { length: 64 }).notNull(),
+  resourceId: varchar('resource_id', { length: 128 }).notNull(),
+  details: jsonb('details').$type<Record<string, any>>().notNull(),
+  ipAddress: varchar('ip_address', { length: 64 }).notNull(),
+  timestamp: tstz('timestamp').notNull()
+}, (table) => [
+  index('audit_logs_timestamp_idx').on(table.timestamp)
+]);
+
+/** Server-side JWT revocation blocklist (SEC-017). Keyed by the token's
+ *  jti (JWT ID) — a PK lookup, so the per-request check is O(1) and cannot
+ *  become an N+1 pattern. Expired rows are purged on every logout. */
+export const revokedTokens = pgTable('revoked_tokens', {
+  jti: varchar('jti', { length: 64 }).primaryKey(),
+  expiresAt: tstz('expires_at').notNull(),
+  revokedAt: tstz('revoked_at').notNull()
+});
+
+export const systemHealth = pgTable('system_health', {
+  service: varchar('service', { length: 128 }).primaryKey(),
+  status: varchar('status', { length: 32 }).$type<SystemHealthStatus['status']>().notNull(),
+  latencyMs: integer('latency_ms').notNull(),
+  lastCheck: tstz('last_check').notNull(),
+  notes: text('notes').notNull()
+});

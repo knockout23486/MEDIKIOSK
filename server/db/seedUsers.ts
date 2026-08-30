@@ -1,10 +1,33 @@
+import bcrypt from 'bcryptjs';
 import { User, Hospital, Department, Practitioner } from './schema.js';
 
-export const seededUsers: User[] = [
+// ============================================================================
+// SEC-007: passwords are hashed with bcrypt (cost 10) BEFORE insertion —
+// the users table never contains plaintext credentials.
+//
+// The demo passwords below are intentionally documented public demo
+// credentials for this SIH showcase platform; production deployments must
+// provision real per-user secrets instead.
+// ============================================================================
+export const DEMO_CREDENTIALS: Record<string, string> = {
+  patient: 'demo123',
+  doctor: 'doctor123',
+  dr_vikram: 'doctor123',
+  triage: 'triage123',
+  admin: 'admin123',
+  sysadmin: 'sysadmin123'
+};
+
+const BCRYPT_COST = 10;
+
+interface RawSeedUser extends Omit<User, 'passwordHash'> {
+  username: string; // narrowed: every seed user must have demo credentials
+}
+
+const rawSeededUsers: RawSeedUser[] = [
   {
     id: 'USR-PAT-01',
     username: 'patient',
-    passwordHash: 'demo123',
     role: 'PATIENT',
     name: 'Smt. Radha Sharma',
     email: 'radha.sharma@example.com',
@@ -14,7 +37,6 @@ export const seededUsers: User[] = [
   {
     id: 'USR-DOC-01',
     username: 'doctor',
-    passwordHash: 'doctor123',
     role: 'DOCTOR',
     name: 'Prof. (Dr.) Ananya Sharma',
     email: 'dr.ananya@aiia.gov.in',
@@ -25,7 +47,6 @@ export const seededUsers: User[] = [
   {
     id: 'USR-DOC-02',
     username: 'dr_vikram',
-    passwordHash: 'doctor123',
     role: 'DOCTOR',
     name: 'Dr. Vikramaditya Sen',
     email: 'dr.sen@aiia.gov.in',
@@ -36,7 +57,6 @@ export const seededUsers: User[] = [
   {
     id: 'USR-TRIAGE-01',
     username: 'triage',
-    passwordHash: 'triage123',
     role: 'TRIAGE',
     name: 'Sister Suniti Rao (Triage Nurse)',
     email: 'triage.station1@aiia.gov.in',
@@ -46,7 +66,6 @@ export const seededUsers: User[] = [
   {
     id: 'USR-ADMIN-01',
     username: 'admin',
-    passwordHash: 'admin123',
     role: 'ADMIN',
     name: 'Dr. Harish Chandra (MS / Admin)',
     email: 'admin.ms@aiia.gov.in',
@@ -56,7 +75,6 @@ export const seededUsers: User[] = [
   {
     id: 'USR-SYSADMIN-01',
     username: 'sysadmin',
-    passwordHash: 'sysadmin123',
     role: 'SYSTEM_ADMIN',
     name: 'DevOps / Integration Lead',
     email: 'tech.lead@aiia.gov.in',
@@ -262,3 +280,14 @@ export const seededPractitioners: Practitioner[] = [
     activeQueueCount: 3
   }
 ];
+
+/**
+ * Builds the seeded users with bcrypt-hashed passwords (called at seed time
+ * only, so normal server boots pay no hashing cost).
+ */
+export function buildSeededUsers(): User[] {
+  return rawSeededUsers.map((u) => ({
+    ...u,
+    passwordHash: bcrypt.hashSync(DEMO_CREDENTIALS[u.username], BCRYPT_COST)
+  }));
+}

@@ -29,8 +29,8 @@ export class AbdmAdapter {
       simulated: true
     };
 
-    // Record Integration Event
-    db.addIntegrationEvent({
+    // Record Integration Event (SQL insert)
+    await db.addIntegrationEvent({
       integrationType: 'ABDM_M1',
       direction: 'OUTBOUND',
       endpoint: 'https://sandbox.abdm.gov.in/v1/registration/mobile/verifyOtp',
@@ -43,9 +43,8 @@ export class AbdmAdapter {
     return result;
   }
 
-  public static generateFhirPatientBundle(patientId: string): Record<string, any> {
-    const state = db.getState();
-    const patient = state.patients.find(p => p.id === patientId);
+  public static async generateFhirPatientBundle(patientId: string): Promise<Record<string, any>> {
+    const patient = await db.patients.get(patientId);
 
     return {
       resourceType: 'Bundle',
