@@ -14,7 +14,7 @@
 //            (denials are written to the PostgreSQL audit trail).
 // ============================================================================
 import 'dotenv/config';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes, randomUUID } from 'crypto';
 import jwt from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
 import { db } from '../db/store.js';
@@ -32,6 +32,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: AuthUser;
+      /** Verified JWT metadata (jti/exp) for routes like /auth/logout. */
+      jwt?: { jti?: string; exp?: number };
     }
   }
 }
@@ -71,6 +73,10 @@ export interface JwtPayload {
   username: string;
   role: UserRole;
   name: string;
+  /** Unique JWT ID — the revocation key (SEC-017). */
+  jti?: string;
+  /** Expiry (epoch seconds) — stored with the blocklist entry for cleanup. */
+  exp?: number;
 }
 
 /** Issues a signed JWT for an authenticated user. */
@@ -78,7 +84,7 @@ export function signToken(user: { id: string; username: string; role: UserRole; 
   return jwt.sign(
     { username: user.username, role: user.role, name: user.name } satisfies Omit<JwtPayload, 'sub'>,
     getJwtSecret(),
-    { subject: user.id, issuer: JWT_ISSUER, expiresIn: JWT_EXPIRES_IN }
+    { subject: user.id, issuer: JWT_ISSUER, expiresIn: JWT_EXPIRES_IN, jwtid: randomUUID() }
   );
 }
 
@@ -117,7 +123,22 @@ export function unauthorized(res: Response, message: string) {
  * With no roles, any authenticated user passes (ALL).
  */
 export function requireAuth(...allowedRoles: UserRole[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await authorize(req, res, next, allowedRoles);
+    } catch (err) {
+      next(err); // Express 4 does not forward async rejections by itself
+    }
+  };
+}
+
+async function authorize(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+  allowedRoles: UserRole[]
+): Promise<void> {
+  {
     const token = extractToken(req);
     if (!token) {
       unauthorized(res, 'Missing Authorization: Bearer <token> header.');
@@ -128,7 +149,16 @@ export function requireAuth(...allowedRoles: UserRole[]) {
       unauthorized(res, 'Invalid or expired token.');
       return;
     }
+    // SEC-017: server-side revocation — one indexed PK lookup (never a
+    // per-row pattern). Logged-out / kiosk-ended sessions die instantly.
+    const revocationKey = payload.jti ?? createHash('sha256').update(token).digest('hex').slice(0, 64);
+    if (await db.revocation.isRevoked(revocationKey)) {
+      unauthorized(res, 'Session has been revoked. Please authenticate again.');
+      return;
+    }
+
     req.user = { id: payload.sub, username: payload.username, role: payload.role, name: payload.name };
+    req.jwt = { jti: payload.jti ?? revocationKey, exp: payload.exp };
 
     if (allowedRoles.length > 0 && !allowedRoles.includes(payload.role)) {
       // Denials are audited (fire-and-forget — the response must not wait on it).
@@ -152,5 +182,5 @@ export function requireAuth(...allowedRoles: UserRole[]) {
       return;
     }
     next();
-  };
+  }
 }

@@ -114,9 +114,22 @@ apiRouter.get('/events', requireAuth(), (req, res) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   });
 
-  // Heartbeat every 25s
+  // Heartbeat every 25s — also re-checks the token blocklist (SEC-017) so a
+  // logged-out session's open stream is closed within one heartbeat.
+  const sessionJti = req.jwt?.jti;
   const interval = setInterval(() => {
-    res.write(`event: ping\ndata: ${JSON.stringify({ time: new Date().toISOString() })}\n\n`);
+    void (async () => {
+      try {
+        if (sessionJti && (await db.revocation.isRevoked(sessionJti))) {
+          clearInterval(interval);
+          res.end();
+          return;
+        }
+        res.write(`event: ping\ndata: ${JSON.stringify({ time: new Date().toISOString() })}\n\n`);
+      } catch {
+        /* stream closed */
+      }
+    })();
   }, 25000);
 
   req.on('close', () => {
@@ -181,6 +194,31 @@ apiRouter.post('/auth/login', loginLimiter, wrap(async (req, res) => {
 // Session introspection for the client.
 apiRouter.get('/auth/me', requireAuth(), wrap(async (req, res) => {
   res.json({ success: true, user: req.user, expires: JWT_EXPIRES_IN });
+}));
+
+/**
+ * SEC-017 — server-side session termination. Inserts the caller's JWT jti
+ * into the revoked_tokens blocklist (until its natural expiry); every
+ * subsequent request carrying this token is rejected with 401 by
+ * requireAuth. Essential on shared/public kiosk hardware where a dropped
+ * client token must not remain mathematically valid for 12 hours.
+ */
+apiRouter.post('/auth/logout', requireAuth(), wrap(async (req, res) => {
+  const { jti, exp } = req.jwt ?? {};
+  if (jti) {
+    await db.revocation.revoke(jti, new Date((exp ?? Math.floor(Date.now() / 1000) + 60) * 1000).toISOString());
+  }
+  await db.addAuditLog({
+    correlationId: 'AUTH-LOGOUT',
+    actorId: req.user!.id,
+    actorRole: req.user!.role,
+    action: 'USER_LOGOUT',
+    resourceType: 'USER',
+    resourceId: req.user!.id,
+    details: { jti },
+    ipAddress: req.ip || '127.0.0.1'
+  });
+  res.json({ success: true, message: 'Session revoked. Token is no longer valid.' });
 }));
 
 apiRouter.get('/users', requireAuth('ADMIN', 'SYSTEM_ADMIN'), wrap(async (_req, res) => {
@@ -428,6 +466,24 @@ apiRouter.get('/documents/:patientId', requireAuth(), wrap(async (req, res) => {
 
 apiRouter.post('/documents/process-demo', requireAuth(...ALL), wrap(async (req, res) => {
   const { documentId, patientId, fileName, rawText } = req.body;
+
+  // SEC-018: bound the unstructured text BEFORE any parsing/regex work — a
+  // multi-megabyte payload must never reach the extraction engine (ReDoS /
+  // event-loop stall surface). Hard cap: 50,000 characters.
+  const RAW_TEXT_MAX = 50_000;
+  if (typeof rawText !== 'string' || rawText.length === 0) {
+    return res.status(400).json({ success: false, code: 'INVALID_PAYLOAD', message: 'rawText is required.' });
+  }
+  if (rawText.length > RAW_TEXT_MAX) {
+    return res.status(400).json({
+      success: false,
+      code: 'PAYLOAD_TOO_LARGE',
+      message: `rawText exceeds the ${RAW_TEXT_MAX}-character limit.`
+    });
+  }
+  if (typeof fileName === 'string' && fileName.length > 512) {
+    return res.status(400).json({ success: false, code: 'INVALID_PAYLOAD', message: 'fileName too long.' });
+  }
 
   // SEC-011: a PATIENT token may only process documents into its OWN record.
   if (!(await patientWritableByCaller(patientId, req.user!))) {

@@ -20,6 +20,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   setRole: (role: UserRole) => void;
   switchUser: (role: UserRole) => void;
+  logout: () => Promise<void>;
 }
 
 const DEFAULT_USERS: Record<UserRole, User> = {
@@ -89,10 +90,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
    * subsequent api.* call carries `Authorization: Bearer <token>`. Falls back
    * to the local demo profile when the API is unreachable (offline demo mode).
    */
+  /**
+   * Ends the current session server-side (SEC-017): the active JWT is added
+   * to the API's revocation blocklist, so it cannot be reused on this shared
+   * kiosk after the operator walks away.
+   */
+  const logout = async () => {
+    await api.logout();
+    setIsAuthenticated(false);
+    setRoleState('PATIENT');
+    setUser(DEFAULT_USERS.PATIENT);
+  };
+
   const switchUser = async (newRole: UserRole) => {
     setRoleState(newRole);
     setUser(DEFAULT_USERS[newRole] || DEFAULT_USERS.PATIENT);
     try {
+      // Revoke the outgoing session before issuing the next one (SEC-017).
+      if (getAuthToken()) await api.logout();
       const creds = DEMO_CREDENTIALS[newRole];
       const res = await api.login(creds.username, creds.password);
       if (res?.success && res?.token) {
@@ -112,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, role, isAuthenticated, setRole: switchUser, switchUser }}>
+    <AuthContext.Provider value={{ user, role, isAuthenticated, setRole: switchUser, switchUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

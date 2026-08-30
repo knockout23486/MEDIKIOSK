@@ -445,6 +445,81 @@ async function main() {
   } catch { ephemeralOk = false; }
   assert(ephemeralOk, 'Dev JWT fallback is RANDOM EPHEMERAL per process (cross-process token rejected)');
 
+  // --- 9. Server-side token revocation (SEC-017) ------------------------------
+  console.log('\n9. Session revocation on logout (SEC-017):');
+  const tokA = await login(base, 'PATIENT');
+  const meA = await call(base, 'GET', '/api/auth/me', tokA);
+  assert(meA.status === 200, 'Fresh session works before logout (200)');
+
+  const logoutA = await call(base, 'POST', '/api/auth/logout', tokA);
+  assert(logoutA.status === 200 && logoutA.body?.success === true, 'POST /api/auth/logout succeeds (200)');
+
+  const meA2 = await call(base, 'GET', '/api/auth/me', tokA);
+  assert(meA2.status === 401, 'ACCEPTANCE: the exact same JWT now fails /auth/me with 401');
+  const phiA = await call(base, 'GET', '/api/patients/PAT-HERO-01', tokA);
+  assert(phiA.status === 401, 'Revoked JWT also fails PHI routes (GET /patients/:id -> 401)');
+  const logoutA2 = await call(base, 'POST', '/api/auth/logout', tokA);
+  assert(logoutA2.status === 401, 'Revoked JWT cannot even call logout again (401)');
+
+  const tokB = await login(base, 'PATIENT');
+  const meB = await call(base, 'GET', '/api/auth/me', tokB);
+  assert(meB.status === 200, 'Revocation is per-token: a fresh concurrent session still works (200)');
+  await call(base, 'POST', '/api/auth/logout', tokB);
+
+  // Blocklist row exists; expired rows are purged on logout.
+  const revokedRows = await db.pool.query(`SELECT COUNT(*)::int AS n FROM revoked_tokens`);
+  assert(revokedRows.rows[0].n >= 1, 'Blocklist rows persist in PostgreSQL (revoked_tokens)');
+  await db.pool.query(`INSERT INTO revoked_tokens (jti, expires_at, revoked_at)
+    VALUES ('purge-test-expired', to_timestamp(0), to_timestamp(0)) ON CONFLICT DO NOTHING`);
+  const tokC = await login(base, 'DOCTOR');
+  await call(base, 'POST', '/api/auth/logout', tokC);
+  const purged = await db.pool.query(`SELECT COUNT(*)::int AS n FROM revoked_tokens WHERE jti = 'purge-test-expired'`);
+  assert(purged.rows[0].n === 0, 'Expired blocklist entries are purged on logout (table stays tiny)');
+
+  // Performance re-inspection (audit item #28): the revocation check adds ONE
+  // indexed PK SELECT per request — measure sequential authenticated calls.
+  const tokD = await login(base, 'DOCTOR');
+  const PERF_N = 150;
+  const t0 = Date.now();
+  for (let i = 0; i < PERF_N; i++) {
+    const r = await call(base, 'GET', '/api/auth/me', tokD);
+    if (r.status !== 200) { console.error(`    ✗ perf run request ${i} -> ${r.status}`); break; }
+  }
+  const perCallMs = (Date.now() - t0) / PERF_N;
+  assert(perCallMs < 20, `No N+1 stall: ${PERF_N} sequential authenticated calls averaged ${perCallMs.toFixed(2)}ms each (<20ms)`);
+  await call(base, 'POST', '/api/auth/logout', tokD);
+
+  // --- 10. Payload guards (SEC-018) ---------------------------------------------
+  console.log('\n10. OCR payload guards (SEC-018):');
+  const staffTok = await login(base, 'TRIAGE');
+  const huge = 'A'.repeat(500_000);
+  const resHuge = await call(base, 'POST', '/api/documents/process-demo', staffTok, {
+    documentId: 'DOC-BIG', patientId: 'PAT-HERO-01', fileName: 'big.txt', rawText: huge
+  });
+  assert(resHuge.status === 400, 'ACCEPTANCE: 500,000-character rawText returns 400 before any parsing');
+  const resMissing = await call(base, 'POST', '/api/documents/process-demo', staffTok, {
+    documentId: 'DOC-X', patientId: 'PAT-HERO-01', fileName: 'x.txt'
+  });
+  assert(resMissing.status === 400, 'Missing rawText returns 400');
+  const labLine = '\nHemoglobin (Hb): 10.2 g/dL [Ref: 12.0 - 15.0 g/dL] (LOW)';
+  const boundary = 'A'.repeat(50_000 - labLine.length); // total == exactly 50,000
+  const t1 = Date.now();
+  const resEdge = await call(base, 'POST', '/api/documents/process-demo', staffTok, {
+    documentId: 'DOC-EDGE', patientId: 'PAT-HERO-01', fileName: 'edge.txt',
+    rawText: boundary + labLine
+  });
+  const edgeMs = Date.now() - t1;
+  assert(resEdge.status === 200, 'Exactly-50,000-char rawText is accepted (boundary, 200)');
+  assert(edgeMs < 2000, `Boundary payload processes quickly (${edgeMs}ms < 2s — no event-loop stall)`);
+
+  // Direct engine probe: pathological input cannot stall extraction.
+  const { OcrEngine } = await import('../server/services/ocrEngine.js');
+  const t2 = Date.now();
+  await OcrEngine.processDocument('DOC-REDOS', 'PAT-HERO-01', 'redos.txt', 'A'.repeat(50_000) + ' ');
+  const engineMs = Date.now() - t2;
+  assert(engineMs < 2000, `Engine handles 50k pathological chars in ${engineMs}ms (<2s, no ReDoS)`);
+  await call(base, 'POST', '/api/auth/logout', staffTok);
+
   console.log('\n================================================================');
   console.log(`Results: ${passed} Passed, ${failed} Failed`);
   console.log(failed === 0

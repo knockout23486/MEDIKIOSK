@@ -859,6 +859,15 @@ export const auditLogs = pgTable('audit_logs', {
   index('audit_logs_timestamp_idx').on(table.timestamp)
 ]);
 
+/** Server-side JWT revocation blocklist (SEC-017). Keyed by the token's
+ *  jti (JWT ID) — a PK lookup, so the per-request check is O(1) and cannot
+ *  become an N+1 pattern. Expired rows are purged on every logout. */
+export const revokedTokens = pgTable('revoked_tokens', {
+  jti: varchar('jti', { length: 64 }).primaryKey(),
+  expiresAt: tstz('expires_at').notNull(),
+  revokedAt: tstz('revoked_at').notNull()
+});
+
 export const systemHealth = pgTable('system_health', {
   service: varchar('service', { length: 128 }).primaryKey(),
   status: varchar('status', { length: 32 }).$type<SystemHealthStatus['status']>().notNull(),

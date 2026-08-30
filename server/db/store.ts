@@ -1064,6 +1064,33 @@ export const db = {
     }
   },
 
+  // ---- token revocation (SEC-017) --------------------------------------------
+  revocation: {
+    /**
+     * Revokes a JWT by its jti until the token's own expiry, and purges
+     * already-expired rows so the blocklist stays tiny (one DELETE on an
+     * indexed column per logout).
+     */
+    async revoke(jti: string, expiresAt: string): Promise<void> {
+      await runInTransaction(async (tx) => {
+        await tx
+          .insert(t.revokedTokens)
+          .values({ jti, expiresAt, revokedAt: now() })
+          .onConflictDoNothing();
+        await tx.execute(sql`DELETE FROM revoked_tokens WHERE expires_at < now()`);
+      });
+    },
+
+    /**
+     * O(1) primary-key lookup used by requireAuth on every authenticated
+     * request — a single indexed SELECT, never a per-row query pattern.
+     */
+    async isRevoked(jti: string): Promise<boolean> {
+      const res = await pool.query('SELECT 1 FROM revoked_tokens WHERE jti = $1 LIMIT 1', [jti]);
+      return res.rowCount !== null && res.rowCount > 0;
+    }
+  },
+
   // ---- notifications / audit / integration reads -----------------------------------------
   notifications: {
     async byPatient(patientId: string): Promise<NotificationItem[]> {

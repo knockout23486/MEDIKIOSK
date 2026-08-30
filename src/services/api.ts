@@ -47,6 +47,20 @@ export const api = {
       return res;
     }),
 
+  /**
+   * SEC-017: server-side session termination — revokes the JWT (blocklist)
+   * before dropping it locally, so the token is invalid even if extracted
+   * from the kiosk afterwards.
+   */
+  logout: async (): Promise<void> => {
+    try {
+      await authFetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      /* network failure — clear locally regardless */
+    }
+    setAuthToken(null);
+  },
+
   // Patients & ABHA
   getPatients: (): Promise<Patient[]> => authFetch('/api/patients').then(r => r.json()),
   getPatient: (id: string): Promise<Patient> => authFetch(`/api/patients/${id}`).then(r => r.json()),
