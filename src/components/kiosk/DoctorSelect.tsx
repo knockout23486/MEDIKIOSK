@@ -49,7 +49,7 @@ export const DoctorSelect: React.FC<DoctorSelectProps> = ({ onSelect, onBack }) 
       </div>
 
       <div className="space-y-4">
-        {doctors.map(doc => {
+        {(doctors ?? []).map(doc => {
           const isSelected = selectedPractitionerId === doc.id;
           return (
             <div

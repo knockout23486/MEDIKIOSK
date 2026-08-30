@@ -97,7 +97,7 @@ export const SummaryReview: React.FC<SummaryReviewProps> = ({ onConfirmed, onBac
               <AlertTriangle className="w-4 h-4 text-rose-600" />
               Known Allergies (Allergy Alert)
             </h4>
-            {summary.allergies.map((al: any, i: number) => (
+            {(summary?.allergies ?? []).map((al: any, i: number) => (
               <div key={i} className="text-xs font-semibold text-rose-950 dark:text-rose-200">
                 • {al.allergen} ({al.severity}): {al.reaction}
               </div>
@@ -108,10 +108,10 @@ export const SummaryReview: React.FC<SummaryReviewProps> = ({ onConfirmed, onBac
           <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
             <h4 className="text-xs font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <Pill className="w-4 h-4 text-blue-600" />
-              Current Medications ({summary.medicationHistory.length})
+              Current Medications ({(summary?.medicationHistory ?? []).length})
             </h4>
             <div className="space-y-1">
-              {summary.medicationHistory.map((m: any, i: number) => (
+              {(summary?.medicationHistory ?? []).map((m: any, i: number) => (
                 <div key={i} className="text-xs text-blue-950 dark:text-blue-200 flex items-center justify-between">
                   <span className="font-semibold">{m.name} {m.dose} ({m.freq})</span>
                   <span className="text-[10px] text-blue-600 opacity-80">{m.source}</span>
@@ -140,7 +140,7 @@ export const SummaryReview: React.FC<SummaryReviewProps> = ({ onConfirmed, onBac
             Information Provenance & Traceability (How this was gathered)
           </h4>
           <div className="flex flex-wrap gap-2">
-            {summary.provenanceSummary.slice(0, 5).map((p: any, i: number) => (
+            {(summary?.provenanceSummary ?? []).slice(0, 5).map((p: any, i: number) => (
               <div key={i} className="flex items-center gap-1.5 bg-white dark:bg-slate-800 p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs">
                 <ProvenanceBadge source={p.source} confidence={p.confidence} />
                 <span className="text-slate-700 dark:text-slate-300 text-[11px] font-medium truncate max-w-[200px]">

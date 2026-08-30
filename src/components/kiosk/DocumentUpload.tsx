@@ -69,7 +69,9 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onDocumentProces
       const res = await api.processDemoDocument({
         documentId: chosen.id,
         patientId: activePatientId,
-        fileName: chosen.fileName
+        fileName: chosen.fileName,
+        // The document API requires extracted text and enforces a 50k limit.
+        rawText: chosen.snippet.slice(0, 50_000)
       });
       onDocumentProcessed(res);
     } catch (e) {
@@ -120,7 +122,7 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({ onDocumentProces
           </div>
 
           <div className="space-y-3">
-            {demoDocs.map(doc => {
+            {(demoDocs ?? []).map(doc => {
               const isSelected = selectedDemoDoc === doc.id;
               return (
                 <div
